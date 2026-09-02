@@ -146,6 +146,11 @@ Fog / rain / 15-deg / 30-deg variations are held out entirely as an optional
   in the report or the comparison is unfair — flag it in the table footnote.
 - Cost: params (M), FLOPs, ms/frame on a fixed device. Rubric wants "computational
   trade-offs".
+- **Noise floor**: vKITTI's `extrinsic.txt` carries ~7 significant digits, so
+  integrating ground-truth relative poses reproduces the ground-truth trajectory
+  only to ~1.7e-4 m on Scene20. That is the best ATE any model could score.
+  Irrelevant in practice, but it is why the GT-through-eval check returns a small
+  non-zero number rather than exactly zero.
 
 ### 2.5 Output schema (`results/<model>/metrics.json`)
 
