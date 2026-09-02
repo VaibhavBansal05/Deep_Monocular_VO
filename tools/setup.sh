@@ -5,6 +5,27 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+echo "==> Checking for a virtual environment"
+if [ -z "${VIRTUAL_ENV:-}" ] && [ -z "${CONDA_DEFAULT_ENV:-}" ]; then
+    cat >&2 <<'MSG'
+    !! No virtualenv active.
+
+       Installing into your user site-packages can shadow system Python
+       packages -- on a machine with ROS installed, a newer pytest breaks
+       the launch_testing plugin, for example.
+
+       Create one first:
+
+           python3 -m venv .venv
+           source .venv/bin/activate
+           bash tools/setup.sh
+
+MSG
+    exit 1
+fi
+echo "    ${VIRTUAL_ENV:-$CONDA_DEFAULT_ENV}"
+
+echo
 echo "==> Installing git hooks"
 git config core.hooksPath .githooks
 echo "    hooksPath = .githooks (blocks direct pushes to main)"
