@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Block direct pushes to main.
+#
+# GitHub does not enforce branch protection on free private repositories, so
+# this is enforced locally instead. Everyone installs it via tools/setup.sh.
+#
+# This is a safety net against accident, not a security control -- it is
+# bypassable with --no-verify. The point is that merges happen through PRs on
+# GitHub so each member's commits stay individually attributed, which is what
+# the project is graded on.
+
+protected="main"
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+    branch="${remote_ref#refs/heads/}"
+    if [ "$branch" = "$protected" ]; then
+        cat >&2 <<'MSG'
+
+  Direct push to main blocked.
+
+  Open a pull request instead:
+
+      git checkout -b <area>/<description>     # e.g. m2/lstm-head
+      git push -u origin <area>/<description>
+
+  Then merge on GitHub with "Create a merge commit".
+
+  (Repo admin doing intentional maintenance: git push --no-verify)
+
+MSG
+        exit 1
+    fi
+done
+exit 0

@@ -36,14 +36,12 @@ See [PLAN.md](PLAN.md) for the full implementation plan and
 ```bash
 git clone <repo-url> && cd Deep_Monocular_VO/src
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-
 # EVERY member must do this once, with the email on their GitHub account.
 # Wrong email -> commits show as an unlinked ghost author and cannot be verified.
 git config user.name  "Your Name"
 git config user.email "your-github-email@example.com"
 
-pytest -q                                            # contract tests must pass
+cd .. && bash tools/setup.sh && cd src   # hooks + identity check + tests
 python scripts/prepare_data.py --root data/vkitti2   # ~6-8 GB subset
 python scripts/train.py --model m4 --config configs/m4.yaml
 python scripts/eval.py  --model m4 --ckpt checkpoints/m4/best.pt
