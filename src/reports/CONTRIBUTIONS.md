@@ -10,7 +10,8 @@ as a signed statement. **Update this in the same PR as the work.** Cross-checked
 |---|:--:|:--:|:--:|:--:|
 | **Base — shared infrastructure** | | | | |
 | Repo scaffold, CI, model contract, training engine | | | | ● |
-| vKITTI 2 download + dataset + preprocessing | ● | | | |
+| vKITTI 2 acquisition + hosting for the team (ops, not code) | | | | ● |
+| vKITTI 2 dataset class + preprocessing pipeline | ● | | | |
 | SE(3) geometry + projection/warping | | ● | | |
 | Metrics (ATE/RPE/depth), trajectory IO, compare.py | | | ● | |
 | **Models** | | | | |

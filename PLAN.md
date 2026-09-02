@@ -277,9 +277,11 @@ self-supervised training (M3) is the item most likely to overrun.
 - No CUDA on the dev machine; 26 GB free. **Do not download all of vKITTI 2** (~40 GB+
   across all variations for RGB + depth).
 - `prepare_data.py` fetches only the needed scene/variation/camera subset:
-  RGB for train+val+test variations listed in §2.3, and depth **only for Scene20/clone
-  + val** (M3's evaluation) plus train depth only if a supervised-depth ablation is
-  wanted. Estimated ~6–8 GB.
+  RGB for the variations listed in §2.3, and depth **only for val + test** (M3 is
+  self-supervised, so it never trains on depth — it is needed for evaluation only).
+  Camera_0 only. That is 8,642 frames: **~1.3 GB RGB + ~0.3 GB depth**.
+  Note the archives themselves are monolithic, so streaming still costs the full
+  download in bandwidth even though only the subset is written to disk.
 - Cache the resized 128x416 tensors once to `.npy`/LMDB — every training run after
   that is I/O-cheap, and the four members can share the same cache archive.
 - Training on Colab (T4/L4) or Kaggle (P100, 30h/week). Each member has their own
