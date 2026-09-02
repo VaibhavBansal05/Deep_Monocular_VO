@@ -1,0 +1,13 @@
+# Model 2 -- CNN (ResNet18) + GRU/LSTM.  OWNER: Abhishek Laxman Jadhav
+model:
+  backbone: resnet18
+  pretrained: true
+  rnn: lstm              # lstm | gru | none  (none = ablation)
+  hidden_size: 512
+  num_layers: 2
+  dropout: 0.2
+  rot_weight: 100.0      # DeepVO's k -- rotation loss is weighted up
+seq_len: 5
+batch_size: 8
+lr: 1.0e-4
+epochs: 60

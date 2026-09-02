@@ -1,0 +1,17 @@
+# Model 3 -- Self-supervised PoseNet + DepthNet.  OWNER: Suryansh Bajaj
+model:
+  backbone: resnet18
+  pretrained: true
+  num_scales: 4
+  min_depth: 0.1
+  max_depth: 100.0
+  ssim_weight: 0.85
+  smooth_weight: 1.0e-3
+  automask: true
+  min_reproj: true       # monodepth2 min-over-reference-frames
+seq_len: 3               # [t-1, t, t+1]
+batch_size: 8
+lr: 1.0e-4
+epochs: 60
+scheduler: step
+lr_step: 45

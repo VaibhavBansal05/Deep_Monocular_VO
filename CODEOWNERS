@@ -1,0 +1,20 @@
+# Directory ownership. Doubles as machine-readable contribution evidence.
+#
+# TODO: replace @PRANAV-GH with Pranav Joshi's GitHub username once he sends it.
+# GitHub warns about unknown users here but does not break; fix before the first PR.
+
+# Shared base — any change needs review from the whole team
+/deep-monocular-vo/mvo/common/            @VaibhavBansal05 @PRANAV-GH @AbhishekJadhav05 @OptimusCoder10
+/deep-monocular-vo/scripts/               @VaibhavBansal05 @PRANAV-GH @AbhishekJadhav05 @OptimusCoder10
+
+# Model folders — single owner each
+/deep-monocular-vo/mvo/models/m1_classical_mlp/      @PRANAV-GH
+/deep-monocular-vo/mvo/models/m2_cnn_rnn/            @AbhishekJadhav05
+/deep-monocular-vo/mvo/models/m3_selfsup_posedepth/  @OptimusCoder10
+/deep-monocular-vo/mvo/models/m4_cnn_attention/      @VaibhavBansal05
+
+# Report sections — each member writes their own
+/deep-monocular-vo/reports/methodology/m1.md  @PRANAV-GH
+/deep-monocular-vo/reports/methodology/m2.md  @AbhishekJadhav05
+/deep-monocular-vo/reports/methodology/m3.md  @OptimusCoder10
+/deep-monocular-vo/reports/methodology/m4.md  @VaibhavBansal05

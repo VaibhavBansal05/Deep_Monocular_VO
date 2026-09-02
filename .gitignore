@@ -1,0 +1,34 @@
+# Data & weights — never commit
+deep-monocular-vo/data/
+deep-monocular-vo/checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.npy
+*.lmdb
+
+# Reference papers (77 MB of PDFs; keep local, GitHub dislikes them)
+REFERENCES/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Internal handoff packets (members create their files from these on their own branch)
+handoff/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Logs
+deep-monocular-vo/runs/
+wandb/
+*.log

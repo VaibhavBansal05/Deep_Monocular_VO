@@ -1,0 +1,13 @@
+# Model 4 -- CNN + CBAM/SE attention.  OWNER: Vaibhav Krishna Bansal
+model:
+  backbone: resnet18
+  pretrained: true
+  attention: cbam        # cbam | se | none  (none = the controlled ablation)
+  reduction: 16
+  spatial_kernel: 7
+  dropout: 0.2
+  rot_weight: 100.0
+seq_len: 2
+batch_size: 16
+lr: 1.0e-4
+epochs: 60

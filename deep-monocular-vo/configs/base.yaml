@@ -1,0 +1,18 @@
+# Shared defaults. Every model config inherits these.
+# Changing anything here changes ALL four models -> needs team approval.
+
+seed: 42
+data_root: data/vkitti2
+img_size: [128, 416]
+
+batch_size: 8
+num_workers: 4
+epochs: 30
+optimizer: adam
+lr: 1.0e-4
+weight_decay: 0.0
+scheduler: cosine
+grad_clip: 1.0
+amp: true
+augment: true
+device: null   # null -> cuda if available
