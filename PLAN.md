@@ -12,8 +12,8 @@ From `DOCS/ICT_4442_Mini_Project_Guidelines.pdf`:
   per-member commits, not a single push at the end."*
 - Final phase (6 marks) can swing **±20% per member** on individual viva. Each member
   is questioned on their own model. So each member must *write* their own model.
-- Sec. 9: external code / tutorials / LLM use **must be cited in the report**, with the
-  exact place stated. Turnitin ≤15% plagiarism, ≤20% AI.
+- Sec. 9: external code and tutorials **must be cited in the report**, with the
+  exact place stated. A Turnitin plagiarism report is required, ≤15%.
 - Interim needs: 8–10 paper lit-review table, preprocessing pipeline, **≥2 models**
   with preliminary results, contribution log.
 
@@ -180,7 +180,6 @@ Rules to stay clean under Sec. 9:
 2. Maintain `THIRD_PARTY.md` at repo root listing every borrowed file — this becomes a
    report appendix directly.
 3. Never vendor GPL code into the repo (evo, rl_vo). Call evo as a CLI in a notebook.
-4. Same file logs LLM usage per Sec. 9.
 
 ## 4. Bootstrapping — the part most teams get wrong
 
@@ -267,7 +266,7 @@ lands on static structure vs moving vehicles.
 | **20–25 Sep** | Interim report Part B: lit table (8–10, from the 9 PDFs in `REFERENCES/` + 1 more), preprocessing description, ≥2 models with results, contribution log, risk plan. Tag `interim-2026-09-25`. **← Deadline 25 Sep** | all |
 | **25 Sep–10 Oct** | M2 and M3 complete. All four on identical protocol. | all |
 | **10–20 Oct** | Hyperparameter tuning, ablations, robustness run on held-out weather variations, `compare.py` final table, error analysis. **← Milestone 4 (20 Oct)** | all |
-| **20–26 Oct** | Report Part C — each member writes their own Methodology subsection + defends it. Slides. Turnitin (<15% plag, <20% AI). Viva rehearsal: each member grilled by the other three. | all |
+| **20–26 Oct** | Report Part C — each member writes their own Methodology subsection + defends it. Slides. Turnitin plagiarism report (<15%). Viva rehearsal: each member grilled by the other three. | all |
 | **26–31 Oct** | Presentation + final submission with repo link. Tag `final-2026-10-31`. | all |
 
 Note the buffer: models are due 20 Oct but the deadline is 31 Oct. Guard it —

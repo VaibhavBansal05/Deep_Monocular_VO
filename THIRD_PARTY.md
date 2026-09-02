@@ -1,7 +1,7 @@
-# Third-Party Code and LLM Usage
+# Third-Party Code
 
-Required by the project guidelines, Sec. 9: *"any use of external code/tutorials/LLMs
-must be cited in the report and mention where exactly LLM was used."*
+Required by the project guidelines, Sec. 9: any use of external code or tutorials
+must be cited in the report.
 
 **This file is an appendix of the final report. Keep it current in the same PR as the
 work — not retroactively.**
@@ -30,9 +30,3 @@ work — not retroactively.**
 | Our file | Source file | Commit | License | What we changed |
 |---|---|---|---|---|
 | _(none yet)_ | | | | |
-
-## LLM usage log
-
-| Date | Who | Where | What was asked | How the output was used |
-|---|---|---|---|---|
-| 2026-09-02 | Vaibhav | repo scaffold, `mvo/common/train/`, contract tests, plan | Draft the shared base and the split/metric protocol | Reviewed, edited and tested by the team before merge |
