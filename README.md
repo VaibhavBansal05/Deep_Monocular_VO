@@ -1,4 +1,4 @@
-# deep-monocular-vo — Deep Learning-Based Monocular Visual Odometry for Autonomous Spatial Mapping
+# Deep_Monocular_VO — Deep Learning-Based Monocular Visual Odometry for Autonomous Spatial Mapping
 
 ICT-4442 Deep Learning Mini Project · Manipal Institute of Technology · Aug–Oct 2026
 
@@ -15,24 +15,24 @@ evaluated on **Virtual KITTI 2** under one identical protocol.
 ## Repository layout
 
 ```
-DOCS/                 course-issued documents — synopsis, guidelines, template
-REFERENCES/           the 9 reference papers (gitignored: 77 MB of PDFs)
-deep-monocular-vo/    everything we build
-  mvo/common/           shared base — split, geometry, metrics, training engine
-  mvo/models/           one folder per model, single owner each
-  configs/              one YAML per model, inheriting configs/base.yaml
-  scripts/              train.py · eval.py · compare.py · prepare_data.py
-  results/              metrics.json + trajectories + plots (committed — evidence)
-  reports/              literature review, methodology sections, contribution log
+DOCS/          course-issued documents — synopsis, guidelines, report template
+REFERENCES/    the 9 reference papers (gitignored: 77 MB of PDFs, kept local)
+src/           everything we build
+  mvo/common/  shared base — split, geometry, metrics, training engine
+  mvo/models/  one folder per model, single owner each
+  configs/     one YAML per model, inheriting configs/base.yaml
+  scripts/     train.py · eval.py · compare.py · prepare_data.py
+  results/     metrics.json + trajectories + plots (committed — evidence)
+  reports/     literature review, methodology sections, contribution log
 ```
 
 See [PLAN.md](PLAN.md) for the full implementation plan and
-[deep-monocular-vo/reports/CONTRIBUTIONS.md](deep-monocular-vo/reports/CONTRIBUTIONS.md) for the task matrix.
+[src/reports/CONTRIBUTIONS.md](src/reports/CONTRIBUTIONS.md) for the task matrix.
 
 ## Quick start
 
 ```bash
-git clone <repo-url> && cd DL_PROJECT/deep-monocular-vo
+git clone <repo-url> && cd Deep_Monocular_VO/src
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
@@ -48,7 +48,7 @@ python scripts/eval.py  --model m4 --ckpt checkpoints/m4/best.pt
 python scripts/compare.py                            # -> the comparison table
 ```
 
-All commands run from `deep-monocular-vo/`.
+All commands run from `src/`.
 
 ## Repository rules
 

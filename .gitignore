@@ -1,6 +1,6 @@
 # Data & weights — never commit
-deep-monocular-vo/data/
-deep-monocular-vo/checkpoints/
+src/data/
+src/checkpoints/
 *.pt
 *.pth
 *.ckpt
@@ -29,6 +29,6 @@ venv/
 .ipynb_checkpoints/
 
 # Logs
-deep-monocular-vo/runs/
+src/runs/
 wandb/
 *.log

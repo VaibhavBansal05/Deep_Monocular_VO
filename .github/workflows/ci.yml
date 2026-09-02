@@ -7,7 +7,7 @@ on:
 
 defaults:
   run:
-    working-directory: deep-monocular-vo
+    working-directory: src
 
 jobs:
   test:

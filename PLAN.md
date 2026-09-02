@@ -1,4 +1,4 @@
-# deep-monocular-vo — Implementation Plan
+# Deep_Monocular_VO — Implementation Plan
 
 Deep Learning-Based Monocular Visual Odometry for Autonomous Spatial Mapping (ICT-4442)
 
@@ -23,14 +23,14 @@ From `DOCS/MVO_Synopsis.pdf`: 4 models, one owner each, one dataset (vKITTI 2),
 ## 1. Repo layout
 
 Repo root holds `DOCS/` (course documents), `REFERENCES/` (papers, gitignored)
-and `deep-monocular-vo/` (everything we build). All commands below run from `deep-monocular-vo/`.
+and `src/` (everything we build). All commands below run from `src/`.
 
 The whole design goal: a **thin shared base** everyone depends on, and **four fat model
 folders nobody else touches**. Merge conflicts are what destroy per-member commit
 attribution, so ownership is enforced by directory.
 
 ```
-deep-monocular-vo/
+src/
   mvo/common/                      # the "base" — frozen by 10 Sep, changes only via PR
     data/
       vkitti.py                # Dataset: returns the standard batch dict
@@ -77,11 +77,11 @@ deep-monocular-vo/
 `CODEOWNERS` doubles as machine-readable evidence of who owns what:
 
 ```
-/deep-monocular-vo/mvo/common/    @vaibhav @pranav @abhishek @suryansh
-/deep-monocular-vo/mvo/models/m1_*/  @pranav
-/deep-monocular-vo/mvo/models/m2_*/  @abhishek
-/deep-monocular-vo/mvo/models/m3_*/  @suryansh
-/deep-monocular-vo/mvo/models/m4_*/  @vaibhav
+/src/mvo/common/    @vaibhav @pranav @abhishek @suryansh
+/src/mvo/models/m1_*/  @pranav
+/src/mvo/models/m2_*/  @abhishek
+/src/mvo/models/m3_*/  @suryansh
+/src/mvo/models/m4_*/  @vaibhav
 ```
 
 ## 2. The base contracts (freeze these first — everything else depends on them)
