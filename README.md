@@ -1,5 +1,7 @@
 # Deep_Monocular_VO — Deep Learning-Based Monocular Visual Odometry for Autonomous Spatial Mapping
 
+[![ci](https://github.com/VaibhavBansal05/Deep_Monocular_VO/actions/workflows/ci.yml/badge.svg)](https://github.com/VaibhavBansal05/Deep_Monocular_VO/actions/workflows/ci.yml)
+
 ICT-4442 Deep Learning Mini Project · Manipal Institute of Technology · Aug–Oct 2026
 
 Four deep-learning architectures for 6-DoF monocular ego-motion estimation, trained and
