@@ -50,6 +50,26 @@ python scripts/compare.py                            # -> the comparison table
 
 All commands run from `src/`.
 
+## Where the work happens
+
+**Code locally, train on Colab.** Everything except GPU training is CPU work — editing,
+the contract tests (~1 s), lint, ORB feature extraction, metrics, plots. Only M2/M3/M4
+training needs a GPU. M1 precomputes its features once and then trains an MLP on 192-d
+vectors, so it runs fine on a laptop CPU.
+
+For GPU runs, copy `notebooks/colab_train_template.ipynb` and change `MODEL`. It mounts
+Drive, unpacks the shared 1.5 GB dataset archive, clones this repo at your branch, trains
+with checkpoints written to Drive (so a disconnect costs one epoch, not the run), and
+evaluates.
+
+Two rules that matter:
+
+- **Never edit model code in a Colab cell.** Edit locally, commit, push, re-clone. Code
+  written only in a notebook is not in your commit history — which is what the project is
+  graded on.
+- **Never commit checkpoints.** `*.pt` stays in Drive. Do commit `results/<model>/metrics.json`,
+  trajectories and plots; they are small and they are the evidence trail.
+
 ## Repository rules
 
 1. **`mvo/common/` is shared.** Changing it needs a PR reviewed by the whole team,
