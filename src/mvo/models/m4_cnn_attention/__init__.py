@@ -21,3 +21,5 @@ Then export it below so the @register decorator fires on import:
 
 Nobody else edits this folder. See handoff/ for the full spec.
 """
+
+from .model import AttentionVO  # noqa: F401
