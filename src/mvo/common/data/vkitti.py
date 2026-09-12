@@ -1,4 +1,4 @@
-"""Virtual KITTI 2 dataset.
+"""Virtual KITTI 2 dataset. See the batch-dict contract below.
 
 OWNER: Pranav Joshi  (branch: base/dataset)
 STATUS: STUB -- implement on your branch.
@@ -18,8 +18,6 @@ Nobody writes their own loader.
     }
 """
 
-"""Virtual KITTI 2 dataset. See the batch-dict contract in the module docstring."""
-
 from pathlib import Path
 
 import numpy as np
@@ -28,8 +26,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 from mvo.common.data import splits
-from mvo.common.data.transforms import (color_jitter, hflip_pose, normalize,
-                                        rescale_intrinsics)
+from mvo.common.data.transforms import color_jitter, hflip_pose, normalize, rescale_intrinsics
 
 
 def _read_extrinsics(path) -> dict[int, np.ndarray]:
@@ -128,7 +125,7 @@ class VKitti2(Dataset):
             if rng.random() < 0.5:
                 imgs = torch.flip(imgs, dims=[-1])
                 K[0, 2] = self.img_size[1] - K[0, 2]     # cx mirrors
-                from mvo.common.geometry import se3      # Abhishek's module
+                from mvo.common.geometry import se3  # Abhishek's module
                 vec = se3.mat_to_vec(torch.from_numpy(rel_pose)).numpy()
                 vec = np.stack([hflip_pose(v) for v in vec])
                 rel_pose = se3.vec_to_mat(torch.from_numpy(vec)).numpy()

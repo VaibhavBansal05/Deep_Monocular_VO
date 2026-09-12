@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 
 from mvo.common.data.transforms import hflip_pose, rescale_intrinsics
 
