@@ -34,6 +34,7 @@ Append one line per member per week. Terse is fine; consistency is the point.
 | Week | Member | What was done | PRs |
 |---|---|---|---|
 | 2 Sep | Vaibhav | Repo scaffold, base contracts, CI, plan | #1 |
+| 16 Sep | Suryansh | Implemented ATE/RPE/KITTI/depth metrics, TUM trajectory IO, comparison table and tests | TBD |
 
 ## Sign-off
 
