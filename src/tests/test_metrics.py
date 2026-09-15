@@ -1,6 +1,7 @@
 import numpy as np
 
 from mvo.common.metrics.ate import ate, umeyama
+from mvo.common.metrics.depth import depth_metrics
 from mvo.common.metrics.rpe import kitti_drift, rpe
 
 
@@ -83,3 +84,12 @@ def test_kitti_drift_returns_nan_on_a_short_sequence():
 
     assert np.isnan(metrics["t_rel_pct"])
     assert np.isnan(metrics["r_rel_deg_per_100m"])
+
+
+def test_depth_metrics_on_a_perfect_prediction():
+    gt = np.random.default_rng(2).uniform(2, 50, size=(64, 64))
+
+    metrics = depth_metrics(gt.copy(), gt)
+
+    assert metrics["abs_rel"] < 1e-9
+    assert metrics["a1"] > 0.999
