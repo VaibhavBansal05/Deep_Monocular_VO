@@ -1,6 +1,7 @@
 import numpy as np
 
 from mvo.common.metrics.ate import ate, umeyama
+from mvo.common.metrics.rpe import kitti_drift, rpe
 
 
 def _traj(n=400, span=200.0):
@@ -62,6 +63,9 @@ def test_perfect_prediction_scores_zero():
     poses = _traj()
 
     assert ate(poses[:, :3, 3], poses[:, :3, 3])["rmse"] < 1e-9
+    assert rpe(poses, poses)["trans_rmse"] < 1e-9
+    assert rpe(poses, poses)["rot_rmse_deg"] < 1e-9
+    assert kitti_drift(poses, poses)["t_rel_pct"] < 1e-6
 
 
 def test_sim3_absorbs_a_global_scale_error_but_se3_does_not():
@@ -70,3 +74,12 @@ def test_sim3_absorbs_a_global_scale_error_but_se3_does_not():
 
     assert ate(pred, gt, with_scale=True)["rmse"] < 1e-9
     assert ate(pred, gt, with_scale=False)["rmse"] > 1.0
+
+
+def test_kitti_drift_returns_nan_on_a_short_sequence():
+    short = _traj(n=20, span=2.0)
+
+    metrics = kitti_drift(short, short)
+
+    assert np.isnan(metrics["t_rel_pct"])
+    assert np.isnan(metrics["r_rel_deg_per_100m"])
