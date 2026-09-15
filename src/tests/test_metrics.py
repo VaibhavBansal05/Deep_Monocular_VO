@@ -1,5 +1,6 @@
 import numpy as np
 
+from mvo.common.io.trajectory import read_tum, write_tum
 from mvo.common.metrics.ate import ate, umeyama
 from mvo.common.metrics.depth import depth_metrics
 from mvo.common.metrics.rpe import kitti_drift, rpe
@@ -93,3 +94,25 @@ def test_depth_metrics_on_a_perfect_prediction():
 
     assert metrics["abs_rel"] < 1e-9
     assert metrics["a1"] > 0.999
+
+
+def test_tum_trajectory_round_trip(tmp_path):
+    poses = _traj(n=4, span=3.0)
+    path = tmp_path / "trajectory.txt"
+
+    write_tum(path, poses)
+    loaded = read_tum(path)
+
+    assert loaded.shape == poses.shape
+    assert np.allclose(loaded, poses, atol=1e-8)
+
+
+def test_read_tum_supports_a_single_pose(tmp_path):
+    pose = _traj(n=2, span=1.0)[1:]
+    path = tmp_path / "single_pose.txt"
+
+    write_tum(path, pose)
+    loaded = read_tum(path)
+
+    assert loaded.shape == (1, 4, 4)
+    assert np.allclose(loaded, pose, atol=1e-8)
