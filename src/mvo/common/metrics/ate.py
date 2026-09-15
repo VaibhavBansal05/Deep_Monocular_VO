@@ -45,6 +45,22 @@ def umeyama(src: np.ndarray, dst: np.ndarray, with_scale: bool = True):
     return R, t, s
 
 
+def align(pred_xyz: np.ndarray, gt_xyz: np.ndarray,
+          with_scale: bool = True) -> tuple[np.ndarray, float]:
+    """Align predicted positions to ground truth and return the solved scale."""
+    R, t, s = umeyama(pred_xyz, gt_xyz, with_scale)
+    aligned = (s * (R @ pred_xyz.T)).T + t
+    return aligned, s
+
+
 def ate(pred_xyz: np.ndarray, gt_xyz: np.ndarray, with_scale: bool = True) -> dict:
-    """Returns {"rmse", "mean", "median", "std", "scale"} in metres."""
-    raise NotImplementedError("owner: Suryansh — branch base/metrics")
+    """Return absolute trajectory error statistics in metres."""
+    aligned, scale = align(pred_xyz, gt_xyz, with_scale)
+    error = np.linalg.norm(aligned - gt_xyz, axis=1)
+    return {
+        "rmse": float(np.sqrt(np.mean(error ** 2))),
+        "mean": float(np.mean(error)),
+        "median": float(np.median(error)),
+        "std": float(np.std(error)),
+        "scale": float(scale),
+    }

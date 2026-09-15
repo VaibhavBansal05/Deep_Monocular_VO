@@ -1,6 +1,21 @@
 import numpy as np
 
-from mvo.common.metrics.ate import umeyama
+from mvo.common.metrics.ate import ate, umeyama
+
+
+def _traj(n=400, span=200.0):
+    t = np.linspace(0, span, n)
+    poses = np.tile(np.eye(4), (n, 1, 1))
+    poses[:, 0, 3] = np.sin(t) * 10
+    poses[:, 2, 3] = t * 5
+    for i in range(n):
+        angle = 0.1 * t[i]
+        poses[i, :3, :3] = np.array([
+            [np.cos(angle), 0.0, np.sin(angle)],
+            [0.0, 1.0, 0.0],
+            [-np.sin(angle), 0.0, np.cos(angle)],
+        ])
+    return poses
 
 
 def test_umeyama_recovers_a_known_similarity():
@@ -41,3 +56,17 @@ def test_umeyama_without_scale_keeps_unit_scale():
     _, _, scale = umeyama(src, dst, with_scale=False)
 
     assert scale == 1.0
+
+
+def test_perfect_prediction_scores_zero():
+    poses = _traj()
+
+    assert ate(poses[:, :3, 3], poses[:, :3, 3])["rmse"] < 1e-9
+
+
+def test_sim3_absorbs_a_global_scale_error_but_se3_does_not():
+    gt = _traj()[:, :3, 3]
+    pred = gt * 0.5
+
+    assert ate(pred, gt, with_scale=True)["rmse"] < 1e-9
+    assert ate(pred, gt, with_scale=False)["rmse"] > 1.0
