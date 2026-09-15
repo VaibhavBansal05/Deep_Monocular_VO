@@ -1,6 +1,6 @@
 """Relative Pose Error and KITTI-style drift.
 
-OWNER: Suryansh Bajaj  (branch: base/metrics). STUB.
+OWNER: Suryansh Bajaj  (branch: base/metrics).
 """
 
 import numpy as np

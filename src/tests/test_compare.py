@@ -59,8 +59,28 @@ def test_render_latex_produces_table_structure():
 
     assert table.startswith("\\begin{tabular}")
     assert "\\hline" in table
+    assert r"t\_rel [\%]" in table
+    assert r"r\_rel [deg/100m]" in table
     assert "\\textbf{1.000}" in table
     assert table.endswith("\\end{tabular}")
+
+
+@pytest.mark.parametrize("non_finite", [float("nan"), float("inf"), float("-inf")])
+def test_render_treats_non_finite_metrics_as_unavailable(non_finite):
+    rows = {
+        "m1": {"owner": "Pranav", "t_rel_pct": non_finite},
+        "m2": {"owner": "Abhishek", "t_rel_pct": 2.0},
+    }
+
+    table = render(rows)
+    rendered_rows = {
+        cells[0]: cells
+        for line in table.splitlines()[2:]
+        if (cells := line.strip("| ").split(" | "))
+    }
+
+    assert rendered_rows["Classical ORB/LK + MLP"][6] == "—"
+    assert rendered_rows["CNN + GRU/LSTM"][6] == "**2.00**"
 
 
 def test_main_adds_scale_note_and_reports_missing_models(tmp_path, monkeypatch, capsys):

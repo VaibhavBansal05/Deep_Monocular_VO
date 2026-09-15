@@ -10,6 +10,7 @@ metrics, so this script is its only source.
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 MODEL_NAMES = {
@@ -30,6 +31,27 @@ COLUMNS = [
     ("ms_per_frame", "ms/frame", "{:.1f}", None),
 ]
 
+_LATEX_ESCAPES = str.maketrans({
+    "\\": r"\textbackslash{}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+})
+
+
+def _latex_escape(value: str) -> str:
+    return str(value).translate(_LATEX_ESCAPES)
+
+
+def _is_finite_number(value) -> bool:
+    return isinstance(value, (int, float)) and math.isfinite(value)
+
 
 def load(results_dir: Path) -> dict:
     """Load each model's metrics from ``results_dir/*/metrics.json``."""
@@ -47,7 +69,7 @@ def render(rows: dict, latex: bool = False) -> str:
         values = [
             rows[model].get(key)
             for model in models
-            if isinstance(rows[model].get(key), (int, float))
+            if _is_finite_number(rows[model].get(key))
         ]
         if values and direction == "min":
             best[key] = min(values)
@@ -57,7 +79,7 @@ def render(rows: dict, latex: bool = False) -> str:
     if latex:
         lines.append("\\begin{tabular}{ll" + "r" * len(COLUMNS) + "}")
         lines.append("\\hline")
-        lines.append(" & ".join(header) + " \\\\")
+        lines.append(" & ".join(_latex_escape(cell) for cell in header) + " \\\\")
         lines.append("\\hline")
     else:
         lines.append("| " + " | ".join(header) + " |")
@@ -66,9 +88,11 @@ def render(rows: dict, latex: bool = False) -> str:
     for model in models:
         row = rows[model]
         cells = [MODEL_NAMES.get(model, model), row.get("owner", "?")]
+        if latex:
+            cells = [_latex_escape(cell) for cell in cells]
         for key, _, fmt, _ in COLUMNS:
             value = row.get(key)
-            if not isinstance(value, (int, float)):
+            if not _is_finite_number(value):
                 cells.append("—")
                 continue
             cell = fmt.format(value)

@@ -1,6 +1,6 @@
 """Trajectory read/write in TUM format, so `evo` can cross-check our metrics.
 
-OWNER: Suryansh Bajaj  (branch: base/metrics). STUB.
+OWNER: Suryansh Bajaj  (branch: base/metrics).
 
 TUM format, one pose per line:  timestamp tx ty tz qx qy qz qw
 """

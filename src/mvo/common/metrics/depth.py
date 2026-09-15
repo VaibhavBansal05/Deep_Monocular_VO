@@ -1,6 +1,6 @@
 """Monocular depth metrics -- Model 3 only.
 
-OWNER: Suryansh Bajaj  (branch: base/metrics). STUB.
+OWNER: Suryansh Bajaj  (branch: base/metrics).
 """
 
 import numpy as np

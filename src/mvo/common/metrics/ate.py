@@ -1,6 +1,6 @@
 """Absolute Trajectory Error with Umeyama alignment.
 
-OWNER: Suryansh Bajaj  (branch: base/metrics). STUB.
+OWNER: Suryansh Bajaj  (branch: base/metrics).
 
 Two numbers are reported for every model, because M1/M2/M4 use GT scale
 alignment while M3 self-scales from depth (see PLAN.md 2.4):
@@ -34,10 +34,8 @@ def umeyama(src: np.ndarray, dst: np.ndarray, with_scale: bool = True):
     R = U @ correction @ Vt
     if with_scale:
         src_variance = np.sum(src_centered ** 2) / n
-        s = (float(np.trace(np.diag(singular_values) @ correction))
+        s = (float(np.trace(np.diag(singular_values) @ correction) / src_variance)
              if src_variance > 0 else 1.0)
-        if src_variance > 0:
-            s /= src_variance
     else:
         s = 1.0
 

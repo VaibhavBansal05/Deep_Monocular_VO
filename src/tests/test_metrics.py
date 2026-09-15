@@ -38,6 +38,7 @@ def test_umeyama_recovers_a_known_similarity():
     assert np.allclose(estimated_rotation, rotation, atol=1e-8)
     assert np.allclose(estimated_translation, translation, atol=1e-8)
     assert np.isclose(estimated_scale, 2.5, atol=1e-8)
+    assert type(estimated_scale) is float
 
 
 def test_umeyama_never_returns_a_reflection():
@@ -59,6 +60,7 @@ def test_umeyama_without_scale_keeps_unit_scale():
     _, _, scale = umeyama(src, dst, with_scale=False)
 
     assert scale == 1.0
+    assert type(scale) is float
 
 
 def test_perfect_prediction_scores_zero():
