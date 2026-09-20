@@ -39,8 +39,26 @@ def so3_exp(w: torch.Tensor) -> torch.Tensor:
 
 
 def so3_log(R: torch.Tensor) -> torch.Tensor:
-    """(..., 3, 3) rotation matrix -> (..., 3) axis-angle."""
-    raise NotImplementedError("se3-utils: so3_log coming next commit")
+    """(..., 3, 3) rotation matrix -> (..., 3) axis-angle.
+
+    Uses the limit theta / (2 sin theta) -> 1/2 as theta -> 0, applied via
+    torch.where so gradients remain finite near the identity.
+    """
+    trace = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
+    cos_t = ((trace - 1.0) * 0.5).clamp(-1.0 + 1e-6, 1.0 - 1e-6)
+    theta = torch.acos(cos_t)
+
+    skew = torch.stack([R[..., 2, 1] - R[..., 1, 2],
+                        R[..., 0, 2] - R[..., 2, 0],
+                        R[..., 1, 0] - R[..., 0, 1]], dim=-1)
+
+    # theta / (2 sin theta) -> 1/2 as theta -> 0. Use the limit directly rather
+    # than dividing by a vanishing sin.
+    sin_t = torch.sin(theta).clamp(min=_EPS)
+    scale = torch.where(theta.abs() < 1e-4,
+                        torch.full_like(theta, 0.5),
+                        theta / (2.0 * sin_t))
+    return skew * scale.unsqueeze(-1)
 
 
 def vec_to_mat(vec: torch.Tensor) -> torch.Tensor:
