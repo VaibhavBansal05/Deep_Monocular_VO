@@ -95,15 +95,38 @@ def compose(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
 
 
 def relative_to_absolute(rel: torch.Tensor, T0: torch.Tensor | None = None) -> torch.Tensor:
-    """(N, 4, 4) chain of T_{t->t+1} -> (N+1, 4, 4) absolute cam-to-world poses."""
-    raise NotImplementedError("se3-utils: chaining coming in next commit")
+    """(N,4,4) chain of T_{i->i+1} -> (N+1,4,4) camera-to-world poses.
+
+    Convention:
+        C_{i+1} = C_i @ rel[i]^{-1}
+
+    The dataset's extrinsic.txt is world-to-camera (E). The batch's abs_pose is
+    camera-to-world (C = E^{-1}). And:
+        rel[i] = T_{i->i+1} = E_{i+1} @ E_i^{-1} = C_{i+1}^{-1} @ C_i
+
+    Integrating: C_{i+1} = C_i @ rel[i]^{-1}.
+    Forgetting the inverse yields a trajectory that looks plausible but drifts
+    backwards; this is the single most common VO implementation bug.
+    """
+    if T0 is None:
+        T0 = torch.eye(4, dtype=rel.dtype, device=rel.device)
+    poses = [T0]
+    inv_rel = invert(rel)
+    for i in range(rel.shape[0]):
+        poses.append(poses[-1] @ inv_rel[i])
+    return torch.stack(poses, dim=0)
 
 
 def absolute_to_relative(abs_poses: torch.Tensor) -> torch.Tensor:
-    """(N, 4, 4) absolute cam-to-world -> (N-1, 4, 4) chain of T_{t->t+1}."""
-    raise NotImplementedError("se3-utils: chaining coming in next commit")
+    """(N,4,4) camera-to-world -> (N-1,4,4) chain of T_{i->i+1}.
+
+    rel[i] = C_{i+1}^{-1} @ C_i
+    """
+    return invert(abs_poses[1:]) @ abs_poses[:-1]
 
 
 def rotation_angle_deg(R: torch.Tensor) -> torch.Tensor:
-    """Geodesic angle of a rotation, in degrees. Used by RPE."""
-    raise NotImplementedError("se3-utils: rotation_angle_deg coming in next commit")
+    """Geodesic rotation angle in degrees. Used by RPE."""
+    trace = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
+    cos_t = ((trace - 1.0) * 0.5).clamp(-1.0, 1.0)
+    return torch.rad2deg(torch.acos(cos_t))
