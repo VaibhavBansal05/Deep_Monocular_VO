@@ -62,35 +62,48 @@ def so3_log(R: torch.Tensor) -> torch.Tensor:
 
 
 def vec_to_mat(vec: torch.Tensor) -> torch.Tensor:
-    """(..., 6) -> (..., 4, 4) homogeneous SE(3) matrix."""
-    raise NotImplementedError("se3-utils: vec_to_mat coming in a later commit")
+    """(..., 6) -> (..., 4, 4) homogeneous SE(3)."""
+    t, w = vec[..., :3], vec[..., 3:]
+    R = so3_exp(w)
+    T = torch.zeros(*vec.shape[:-1], 4, 4, dtype=vec.dtype, device=vec.device)
+    T[..., :3, :3] = R
+    T[..., :3, 3] = t
+    T[..., 3, 3] = 1.0
+    return T
 
 
 def mat_to_vec(mat: torch.Tensor) -> torch.Tensor:
-    """(..., 4, 4) -> (..., 6) pose vector."""
-    raise NotImplementedError("se3-utils: mat_to_vec coming in a later commit")
+    """(..., 4, 4) -> (..., 6)."""
+    return torch.cat([mat[..., :3, 3], so3_log(mat[..., :3, :3])], dim=-1)
 
 
 def invert(T: torch.Tensor) -> torch.Tensor:
-    """(..., 4, 4) -> inverse transform, exploiting R^-1 = R^T."""
-    raise NotImplementedError("se3-utils: invert coming in a later commit")
+    """Inverse of an SE(3) stack, using R^-1 = R^T (never torch.inverse)."""
+    R = T[..., :3, :3]
+    t = T[..., :3, 3:]
+    Rt = R.transpose(-1, -2)
+    out = torch.zeros_like(T)
+    out[..., :3, :3] = Rt
+    out[..., :3, 3:] = -Rt @ t
+    out[..., 3, 3] = 1.0
+    return out
 
 
 def compose(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
     """Matrix product A @ B for stacks of SE(3)."""
-    raise NotImplementedError("se3-utils: compose coming in a later commit")
+    return A @ B
 
 
 def relative_to_absolute(rel: torch.Tensor, T0: torch.Tensor | None = None) -> torch.Tensor:
     """(N, 4, 4) chain of T_{t->t+1} -> (N+1, 4, 4) absolute cam-to-world poses."""
-    raise NotImplementedError("se3-utils: chaining coming in a later commit")
+    raise NotImplementedError("se3-utils: chaining coming in next commit")
 
 
 def absolute_to_relative(abs_poses: torch.Tensor) -> torch.Tensor:
     """(N, 4, 4) absolute cam-to-world -> (N-1, 4, 4) chain of T_{t->t+1}."""
-    raise NotImplementedError("se3-utils: chaining coming in a later commit")
+    raise NotImplementedError("se3-utils: chaining coming in next commit")
 
 
 def rotation_angle_deg(R: torch.Tensor) -> torch.Tensor:
     """Geodesic angle of a rotation, in degrees. Used by RPE."""
-    raise NotImplementedError("se3-utils: rotation_angle_deg coming in a later commit")
+    raise NotImplementedError("se3-utils: rotation_angle_deg coming in next commit")
