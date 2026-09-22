@@ -55,20 +55,35 @@ class PoseDecoder(nn.Module):
 
     def __init__(self, in_channels: int = 512, width: int = 256, dropout: float = 0.2):
         super().__init__()
+        self.head = nn.Conv2d(width, 6, 1)
         self.net = nn.Sequential(
             nn.Conv2d(in_channels, width, 1), nn.ReLU(inplace=True),
             nn.Conv2d(width, width, 3, padding=1), nn.ReLU(inplace=True),
             nn.Conv2d(width, width, 3, padding=1), nn.ReLU(inplace=True),
             nn.Dropout2d(dropout),
-            nn.Conv2d(width, 6, 1),
+            self.head,
         )
+        # Zero-init the last layer so the model predicts EXACTLY the identity
+        # transform at initialisation -- the right prior for adjacent video
+        # frames, and it keeps so3_exp away from its large-angle regime early.
+        #
+        # This replaces the constant output scaling used by monodepth2's pose
+        # decoder. That 0.01 factor suits a network predicting scale-ambiguous
+        # translation, but vKITTI 2 supplies METRIC poses: measured over the
+        # training split, mean |t| = 0.61 m, so the decoder would have to drive
+        # its raw output to ~61 while its gradient was damped 100x. Zero-init
+        # gives the same near-identity start with no damping.
+        #
+        # Consequence: on the very first step dL/dx = W = 0, so the encoder
+        # receives no gradient and is frozen for exactly that one step. The
+        # head itself still learns (dL/dW = x), so W leaves zero immediately
+        # and the backbone unblocks from step 2 onwards. Same mechanism as
+        # ControlNet's zero convolutions. Both halves are covered by tests.
+        nn.init.zeros_(self.head.weight)
+        nn.init.zeros_(self.head.bias)
 
     def forward(self, feat: torch.Tensor) -> torch.Tensor:
-        # The 0.01 factor keeps predictions near zero at initialisation. That
-        # matters here: the 6-vector is an axis-angle, so a near-zero output is
-        # a near-identity transform -- a sane prior for adjacent video frames,
-        # and it keeps so3_exp away from its large-angle regime early on.
-        return self.net(feat).mean(dim=(2, 3)) * 0.01
+        return self.net(feat).mean(dim=(2, 3))
 
 
 @register("m4")
@@ -79,7 +94,7 @@ class AttentionVO(BaseVOModel):
     def __init__(self, backbone: str = "resnet18", pretrained: bool = True,
                  attention: str = "none", reduction: int = 16,
                  spatial_kernel: int = 7, dropout: float = 0.2,
-                 rot_weight: float = 100.0):
+                 rot_weight: float = 5900.0):
         super().__init__()
         if backbone not in _BACKBONES:
             raise ValueError(f"unknown backbone {backbone!r}; expected {list(_BACKBONES)}")
@@ -132,7 +147,14 @@ class AttentionVO(BaseVOModel):
         trans = ((pred[..., :3] - target[..., :3]) ** 2).mean()
         rot = ((pred[..., 3:] - target[..., 3:]) ** 2).mean()
 
-        # Between adjacent frames rotation is ~1e-2 rad while translation is
-        # ~1 m, so an unweighted sum is dominated by translation and the model
-        # learns to predict a straight line. DeepVO's k=100 rebalances them.
+        # Rotation and translation live on wildly different scales, so an
+        # unweighted sum is dominated by translation and the model learns to
+        # predict a straight line. DeepVO introduces a weight k for this.
+        #
+        # k is measured, not guessed. Over the training split the variance of
+        # the targets is trans 2.00e-1 vs rot 3.41e-5, a ratio of ~5900:1, so
+        # k=5900 puts the two terms on equal footing at initialisation.
+        # DeepVO's published k=100 was tuned for KITTI's scale convention and
+        # leaves rotation ~59x under-weighted here.
+        # Reproduce with: scripts/measure_pose_stats.py
         return {"total": trans + self.rot_weight * rot, "trans": trans, "rot": rot}

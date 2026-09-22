@@ -2,11 +2,15 @@
 model:
   backbone: resnet18
   pretrained: true
-  attention: cbam        # cbam | se | none  (none = the controlled ablation)
+  # none is the ablation baseline and trains today; cbam/se land on m4/cbam.
+  # Switch this to cbam once that branch merges.
+  attention: none        # cbam | se | none  (none = the controlled ablation)
   reduction: 16
   spatial_kernel: 7
   dropout: 0.2
-  rot_weight: 100.0
+  # Measured, not guessed: E[t^2]/E[r^2] = 5869 on the training split.
+  # Reproduce with scripts/measure_pose_stats.py
+  rot_weight: 5900.0
 seq_len: 2
 batch_size: 16
 lr: 1.0e-4
