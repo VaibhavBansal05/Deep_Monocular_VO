@@ -34,8 +34,7 @@ Append one line per member per week. Terse is fine; consistency is the point.
 | Week | Member | What was done | PRs |
 |---|---|---|---|
 | 2 Sep | Vaibhav | Repo scaffold, base contracts, CI, plan | #1 |
-| 3 Sep | Vaibhav | vKITTI2 acquisition + shared archive; Colab template | main |
-| 3 Sep | Vaibhav | M4 backbone (ResNet18 6-ch + pose decoder) + tests | m4/backbone |
+| 16 Sep | Suryansh | Implemented ATE/RPE/KITTI/depth metrics, TUM trajectory IO, comparison table and tests | #2 |
 
 ## Sign-off
 
