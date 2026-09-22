@@ -29,4 +29,4 @@ work — not retroactively.**
 
 | Our file | Source file | Commit | License | What we changed |
 |---|---|---|---|---|
-| _(none yet)_ | | | | |
+| `mvo/common/geometry/projection.py` | `ClementPinard/SfmLearner-Pytorch` `inverse_warp.py` | MIT | Added valid mask (out-of-frame + behind-camera), split into `backproject`/`project`/`inverse_warp`, removed homogeneous intermediate |
