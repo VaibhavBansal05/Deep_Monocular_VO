@@ -94,16 +94,22 @@ def test_inflation_preserves_the_pretrained_response():
     gave on one frame. Without the division the pre-activation doubles and
     BatchNorm's running statistics are meaningless from the first step.
     """
-    # In float64 the identity is exact, so assert it exactly. float32 differs by
-    # ~2e-6 purely from summing 6 channels instead of 3 -- accumulation order,
-    # not a modelling error -- so it gets a realistic tolerance below.
+    # The identity is exact in exact arithmetic, but NOT bitwise reproducible:
+    # summing 6 channels instead of 3 changes the accumulation order, and the
+    # order depends on the convolution backend. torch.equal() here passed on
+    # one machine and failed on Colab over the last few bits.
+    #
+    # float64 with 7*7*6 accumulations on O(1) values leaves error ~3e-14, so
+    # 1e-12 has ~30x headroom while still catching the failure that matters:
+    # dropping the division scales the output by the repeat count, an O(1)
+    # discrepancy that is ~12 orders of magnitude larger.
     conv3 = nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False).double()
     conv6 = _inflate_conv1(conv3, 6).double()
 
     x3 = torch.randn(1, 3, 64, 64, dtype=torch.float64)
     x6 = torch.cat([x3, x3], dim=1)
 
-    assert torch.equal(conv6(x6), conv3(x3))
+    torch.testing.assert_close(conv6(x6), conv3(x3), atol=1e-12, rtol=0)
 
 
 def test_inflation_holds_in_float32_within_accumulation_error():
