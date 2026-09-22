@@ -179,14 +179,42 @@ def test_rotation_weight_balances_the_two_loss_terms():
 # ------------------------------------------------------------------ backward
 
 
-def test_gradients_reach_the_stem_and_stay_finite():
+def test_backbone_receives_no_gradient_on_the_very_first_step():
+    """A consequence of zero-initialising the head, and it is intended.
+
+    For y = Wx with W = 0:  dL/dW = x != 0, so the head learns, but
+    dL/dx = W = 0, so nothing propagates into the encoder. The backbone is
+    therefore frozen for exactly one step. This is the same "zero convolution"
+    behaviour ControlNet relies on.
+
+    Asserted rather than merely tolerated, so that swapping the head's
+    initialisation is a deliberate decision and not a silent change.
+    """
     m = _model()
     b = _realistic_batch()
     m.compute_loss(b, m(b))["total"].backward()
 
+    assert m.decoder.head.weight.grad.abs().sum() > 0, "the head itself must learn"
+    assert m.stem[0].weight.grad.abs().sum() == 0, (
+        "expected no gradient into the backbone while head.weight is zero")
+
+
+def test_gradients_reach_the_stem_after_one_optimiser_step():
+    """The freeze above must last exactly one step, not forever."""
+    m = _model()
+    opt = torch.optim.Adam(m.parameters(), lr=1e-4)
+    b = _realistic_batch()
+
+    opt.zero_grad()
+    m.compute_loss(b, m(b))["total"].backward()
+    opt.step()                      # head.weight departs from zero here
+
+    opt.zero_grad()
+    m.compute_loss(b, m(b))["total"].backward()
+
     g = m.stem[0].weight.grad
     assert g is not None and torch.isfinite(g).all()
-    assert g.abs().sum() > 0, "no gradient reached the inflated stem"
+    assert g.abs().sum() > 0, "backbone still frozen after an optimiser step"
 
 
 # ------------------------------------------------------------------ ablation

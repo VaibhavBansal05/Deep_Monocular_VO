@@ -73,6 +73,12 @@ class PoseDecoder(nn.Module):
         # training split, mean |t| = 0.61 m, so the decoder would have to drive
         # its raw output to ~61 while its gradient was damped 100x. Zero-init
         # gives the same near-identity start with no damping.
+        #
+        # Consequence: on the very first step dL/dx = W = 0, so the encoder
+        # receives no gradient and is frozen for exactly that one step. The
+        # head itself still learns (dL/dW = x), so W leaves zero immediately
+        # and the backbone unblocks from step 2 onwards. Same mechanism as
+        # ControlNet's zero convolutions. Both halves are covered by tests.
         nn.init.zeros_(self.head.weight)
         nn.init.zeros_(self.head.bias)
 
