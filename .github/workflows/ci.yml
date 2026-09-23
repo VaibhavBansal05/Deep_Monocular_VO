@@ -20,9 +20,16 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # torch and torchvision MUST come from the same index. Installing
+          # only torch from the CPU index leaves pip to resolve torchvision
+          # from PyPI, where it is built against the CUDA wheel; its compiled
+          # ops then fail to register:
+          #   RuntimeError: operator torchvision::nms does not exist
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[dev]"
       - name: Lint
         run: ruff check mvo scripts tests
       - name: Test
-        run: pytest -q
+        # Autoload off so CI matches what developers run locally; the suite
+        # needs no third-party plugins.
+        run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q
