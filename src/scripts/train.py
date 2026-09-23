@@ -38,6 +38,9 @@ def main() -> None:
     ap.add_argument("--out", default=None, help="defaults to checkpoints/<model>")
     ap.add_argument("--resume", default=None)
     ap.add_argument("--epochs", type=int, default=None)
+    ap.add_argument("--num-workers", type=int, default=None,
+                    help="dataloader workers; lower it on hosts with few vCPUs "
+                         "(Kaggle allocates 2-4, and oversubscribing slows loading)")
     args = ap.parse_args()
 
     import_all_models()
@@ -49,6 +52,8 @@ def main() -> None:
         cfg["data_root"] = args.data_root
     if args.epochs:
         cfg["epochs"] = args.epochs
+    if args.num_workers is not None:
+        cfg["num_workers"] = args.num_workers
 
     set_seed(cfg.get("seed", 42))
 
