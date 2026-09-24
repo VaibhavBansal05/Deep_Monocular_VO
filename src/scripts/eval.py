@@ -42,18 +42,36 @@ def git_sha() -> str:
 
 @torch.no_grad()
 def predict_sequence(model, loader, device) -> tuple[np.ndarray, float]:
-    """Run the model over a sequence -> (N-1, 4, 4) relative poses, ms/frame."""
+    """Run the model over a sequence -> (N-1, 4, 4) relative poses, ms/frame.
+
+    The dataset yields a sliding window of stride 1, so sample i covers frames
+    [i .. i+S-1] and predicts S-1 relative poses. Concatenating all of them
+    counts every transition S-1 times: for S=5 that is 3332 poses where the
+    trajectory needs 836, and integrating them produces a trajectory roughly
+    four times too long.
+
+    To reconstruct the trajectory exactly once, take the FIRST predicted pose
+    of each window -- the (i, i+1) transition -- and then the remaining
+    transitions from the final window:
+
+        (N - S + 1) + (S - 2) = N - 1
+    """
     model.eval()
-    rels, n_frames = [], 0
+    per_window, n_frames = [], 0
     t0 = time.time()
     for batch in loader:
         batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
         out = model(batch)
-        pose = out["pose"].reshape(-1, 6).float().cpu()
-        rels.append(se3.vec_to_mat(pose).numpy())
-        n_frames += pose.shape[0]
+        pose = out["pose"].float().cpu()          # (B, S-1, 6)
+        per_window.append(pose)
+        n_frames += pose.shape[0] * pose.shape[1]
     ms = (time.time() - t0) * 1000.0 / max(n_frames, 1)
-    return np.concatenate(rels, axis=0), ms
+
+    poses = torch.cat(per_window, dim=0)          # (n_windows, S-1, 6)
+    first = poses[:, 0]                           # one transition per window
+    tail = poses[-1, 1:]                          # finish the last window
+    vec = torch.cat([first, tail], dim=0) if tail.numel() else first
+    return se3.vec_to_mat(vec).numpy(), ms
 
 
 def main() -> None:
@@ -81,6 +99,12 @@ def main() -> None:
         sid = splits.seq_id(scene, variation)
         ds = VKitti2(root=args.data_root, split=args.split, seq_len=model.seq_len,
                      need_depth=model.needs_depth, augment=False)
+        # Restrict to this sequence. Without it a multi-sequence split (e.g. the
+        # robustness set) would be evaluated end-to-end, chaining unrelated
+        # trajectories together, once per sequence.
+        ds.samples = [s for s in ds.samples if s[0] == sid]
+        if not ds.samples:
+            raise RuntimeError(f"no samples for {sid}")
         loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=2)
 
         rel, ms = predict_sequence(model, loader, device)
