@@ -233,11 +233,11 @@ def test_gradients_reach_the_stem_after_one_optimiser_step():
 # ------------------------------------------------------------------ ablation
 
 
-@pytest.mark.parametrize("attn", ["cbam", "se"])
-def test_attention_variants_are_not_implemented_yet(attn):
-    """Guards the ablation contract: these must exist by the m4/cbam branch."""
-    with pytest.raises(NotImplementedError, match="m4/cbam"):
-        _model(attention=attn)
+@pytest.mark.parametrize("attn", ["none", "cbam", "se"])
+def test_every_ablation_variant_is_available(attn):
+    """The ablation M4 exists to run needs all three to build and run."""
+    out = _model(attention=attn)(_batch(b=2))
+    assert out["pose"].shape == (2, 1, 6)
 
 
 def test_rejects_an_unknown_attention_name():

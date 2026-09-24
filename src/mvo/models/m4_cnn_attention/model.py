@@ -16,6 +16,7 @@ from mvo.common.data.pose_stats import denormalize, normalize, pose_mean_std
 from mvo.common.geometry import se3
 from mvo.common.train.base_model import BaseVOModel
 from mvo.common.train.registry import register
+from mvo.models.m4_cnn_attention.attention import build_attention
 
 _BACKBONES = {
     "resnet18": (resnet18, ResNet18_Weights.IMAGENET1K_V1, 512),
@@ -96,16 +97,12 @@ class AttentionVO(BaseVOModel):
                  attention: str = "none", reduction: int = 16,
                  spatial_kernel: int = 7, dropout: float = 0.2,
                  rot_weight: float = 1.0, whiten: bool = True,
-                 seq_len: int = 2):
+                 seq_len: int = 2, attention_residual: bool = True):
         super().__init__()
         if backbone not in _BACKBONES:
             raise ValueError(f"unknown backbone {backbone!r}; expected {list(_BACKBONES)}")
         if attention not in ("none", "cbam", "se"):
             raise ValueError(f"unknown attention {attention!r}; expected none|cbam|se")
-        if attention != "none":
-            raise NotImplementedError(
-                f"attention={attention!r} lands on branch m4/cbam (owner: Vaibhav). "
-                "attention='none' is the ablation baseline and works today.")
 
         ctor, weights, feat_channels = _BACKBONES[backbone]
         net = ctor(weights=weights if pretrained else None)
@@ -125,20 +122,40 @@ class AttentionVO(BaseVOModel):
         self.stem = nn.Sequential(net.conv1, net.bn1, net.relu, net.maxpool)
         self.layer1, self.layer2 = net.layer1, net.layer2
         self.layer3, self.layer4 = net.layer3, net.layer4
+        # One block after each residual stage. ResNet18 stage widths.
+        widths = (64, 128, 256, feat_channels)
+        self.attn1, self.attn2, self.attn3, self.attn4 = (
+            build_attention(attention, w, reduction, spatial_kernel,
+                            residual=attention_residual) for w in widths)
+
         self.decoder = PoseDecoder(feat_channels, dropout=dropout)
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """(B,6,H,W) -> (B,512,H/32,W/32).
 
-        Attention blocks will be applied after each layer here on m4/cbam,
-        which is why the stages are kept separate rather than nn.Sequential.
+        Stages are kept separate so an attention block can be applied after
+        each one.
         """
         x = self.stem(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.attn1(self.layer1(x))
+        x = self.attn2(self.layer2(x))
+        x = self.attn3(self.layer3(x))
+        x = self.attn4(self.layer4(x))
         return x
+
+    def spatial_maps(self) -> list[torch.Tensor]:
+        """Spatial attention maps from the last forward pass, coarse to fine.
+
+        Empty unless attention='cbam'; SE has no spatial branch. Used to
+        overlay where the model looked onto the input frame.
+        """
+        out = []
+        for a in (self.attn1, self.attn2, self.attn3, self.attn4):
+            blk = getattr(a, "block", None)
+            m = getattr(blk, "last_spatial_map", None)
+            if m is not None:
+                out.append(m)
+        return out
 
     def forward(self, batch: dict) -> dict:
         imgs = batch["imgs"]                       # (B, S, 3, H, W)

@@ -3,9 +3,10 @@ model:
   seq_len: 2
   backbone: resnet18
   pretrained: true
-  # none is the ablation baseline and trains today; cbam/se land on m4/cbam.
-  # Switch this to cbam once that branch merges.
-  attention: none        # cbam | se | none  (none = the controlled ablation)
+  attention: cbam        # cbam | se | none  (none = the controlled ablation)
+  attention_residual: true   # zero-init gate: identity at init, so inserting
+                             # attention does not disturb the pretrained
+                             # backbone before training. false = paper-faithful.
   reduction: 16
   spatial_kernel: 7
   dropout: 0.2
