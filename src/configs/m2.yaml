@@ -6,13 +6,8 @@ model:
   hidden_size: 512
   num_layers: 2
   dropout: 0.2
-  # Measured on the training split, not taken from the paper:
-  #   E[t^2] = 2.00e-1,  E[r^2] = 3.41e-5  ->  ratio ~5869 : 1
-  # DeepVO's published k=100 was tuned for KITTI's scale convention; here it
-  # leaves the rotation term ~59x smaller than the translation term, so the
-  # model can ignore rotation and still reduce the loss -- it drifts toward
-  # predicting a straight line. Reproduce with scripts/measure_pose_stats.py
-  rot_weight: 5900.0
+  whiten: true           # whitened pose targets; see mvo/common/data/pose_stats.py
+  rot_weight: 1.0        # whitening makes the axes commensurate
 seq_len: 5
 batch_size: 8
 lr: 1.0e-4
