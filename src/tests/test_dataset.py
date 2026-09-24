@@ -20,3 +20,46 @@ def test_hflip_flips_only_tx_ry_rz():
     f = hflip_pose(p)
     assert f[0] == -p[0] and f[4] == -p[4] and f[5] == -p[5]
     assert f[1] == p[1] and f[2] == p[2] and f[3] == p[3]
+
+
+# --------------------------------------------------- augmentation regressions
+
+def _train_ds(**kw):
+    import pytest
+    from mvo.common.data.vkitti import VKitti2
+    try:
+        return VKitti2(root="data/vkitti2", split="train", seq_len=2, **kw)
+    except FileNotFoundError:
+        pytest.skip("dataset not present")
+
+
+def test_augmentation_is_not_frozen_per_sample():
+    """Regression: rng seeded from idx made each sample's jitter and flip
+    identical in every epoch, so augmentation regularised nothing."""
+    import torch
+    ds = _train_ds(augment=True)
+    reads = [ds[7]["imgs"] for _ in range(6)]
+    assert any(not torch.equal(reads[0], r) for r in reads[1:]), \
+        "augmentation produced identical output six times; rng is seeded per sample"
+
+
+def test_augmented_samples_keep_a_stable_schema():
+    """Regression: dropping abs_pose only on flipped samples made flipped and
+    unflipped items carry different keys, and default_collate raised KeyError
+    on the first mixed batch."""
+    ds = _train_ds(augment=True)
+    keys = [frozenset(ds[i].keys()) for i in range(24)]
+    assert len(set(keys)) == 1, f"schema varies across samples: {set(keys)}"
+
+
+def test_rel_pose_and_abs_pose_agree_under_augmentation():
+    """rel_pose[i] = inv(A[i+1]) @ A[i] must hold whether or not the sample was
+    flipped; the contract claims the two fields describe the same motion."""
+    import torch
+    ds = _train_ds(augment=True)
+    for i in range(0, 60, 5):
+        s = ds[i]
+        E = torch.linalg.inv(s["abs_pose"])
+        implied = E[1] @ torch.linalg.inv(E[0])
+        assert torch.allclose(implied, s["rel_pose"][0], atol=1e-3), \
+            f"sample {i}: abs_pose and rel_pose disagree"

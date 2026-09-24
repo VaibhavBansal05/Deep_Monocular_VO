@@ -9,6 +9,7 @@ import pytest
 import torch
 import torch.nn as nn
 
+from mvo.common.geometry import se3
 from mvo.common.train.registry import build, import_all_models
 from mvo.models.m4_cnn_attention.model import AttentionVO, _inflate_conv1
 
@@ -140,7 +141,9 @@ def test_initial_prediction_is_exactly_the_identity():
     metric (mean |t| = 0.61 m), so scaling the head down damps translation
     gradients without buying anything.
     """
-    out = _model()(_batch(b=4))
+    # whiten=False, since the whitened head deliberately starts at the mean
+    # pose instead; that behaviour has its own test below.
+    out = _model(whiten=False)(_batch(b=4))
     assert torch.equal(out["pose"], torch.zeros_like(out["pose"]))
 
 
@@ -159,10 +162,14 @@ def test_head_is_zero_initialised_but_trainable():
 
 
 def test_rotation_weight_balances_the_two_loss_terms():
-    """rot_weight is derived from measured target variance (E[t^2]/E[r^2] ~ 5869
-    on the training split), so the weighted rotation term must be comparable to
-    the translation term rather than ~59x smaller as it was with k=100."""
-    m = _model()
+    """The unwhitened path still needs DeepVO's k, and it must be measured.
+
+    E[t^2]/E[r^2] is ~5869 on the training split, so the published k=100 leaves
+    rotation ~59x under-weighted. Whitening supersedes this (each axis gets an
+    equal share regardless), but the unwhitened path remains available for the
+    ablation and must stay correct.
+    """
+    m = _model(whiten=False, rot_weight=5900.0)
     assert m.rot_weight > 1000, "k=100 leaves rotation effectively ignored"
 
     # The balance is defined at initialisation, where the model predicts zero
@@ -266,3 +273,53 @@ def test_loss_is_finite_and_weights_rotation():
     assert torch.isfinite(losses["total"])
     assert torch.allclose(losses["total"],
                           losses["trans"] + m.rot_weight * losses["rot"])
+
+
+# ------------------------------------------------------------- pose whitening
+
+
+def test_whitened_model_starts_at_the_mean_pose_not_the_identity():
+    """The point of adding the mean back.
+
+    With a zero-initialised head, an unwhitened model predicts the identity --
+    a stationary camera, which scores t_rel 99.16% on Scene20. The whitened
+    model instead starts at the average training motion, which is where the
+    trivial constant predictor ends, so training begins from a far better
+    prior.
+    """
+    from mvo.common.data.pose_stats import POSE_MEAN
+
+    out = _model(whiten=True)(_batch(b=2))
+    expected = torch.tensor(POSE_MEAN)
+    assert torch.allclose(out["pose"][0, 0], expected, atol=1e-6)
+
+    plain = _model(whiten=False)(_batch(b=2))
+    assert torch.equal(plain["pose"], torch.zeros_like(plain["pose"]))
+
+
+def test_whitening_equalises_the_per_axis_gradient_share():
+    """Why whitening exists: unwhitened, tz takes 99.89% of the gradient."""
+    from mvo.common.data.pose_stats import POSE_STD
+
+    std = torch.tensor(POSE_STD)
+    plain_share = (std ** 2) / (std ** 2).sum()
+    assert plain_share[2] > 0.99, "tz should dominate an unwhitened MSE"
+
+    whitened = torch.ones(6) / 6.0          # unit variance on every axis
+    assert abs(float(whitened.max() - whitened.min())) < 1e-6
+
+
+def test_whitened_loss_is_scale_free_across_axes():
+    """An error of one standard deviation must cost the same on every axis."""
+    m = _model(whiten=True)
+    b = _batch(b=1)
+    b["rel_pose"] = torch.eye(4).expand(1, 1, 4, 4).contiguous()
+
+    costs = []
+    for axis in range(6):
+        off = torch.zeros(1, 1, 6)
+        off[0, 0, axis] = m.pose_std[axis]          # one sigma on this axis
+        target = se3.mat_to_vec(b["rel_pose"])
+        costs.append(float(m.compute_loss(b, {"pose": target + off})["total"]))
+
+    assert max(costs) / min(costs) < 1.01, f"axis costs differ: {costs}"

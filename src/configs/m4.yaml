@@ -8,9 +8,8 @@ model:
   reduction: 16
   spatial_kernel: 7
   dropout: 0.2
-  # Measured, not guessed: E[t^2]/E[r^2] = 5869 on the training split.
-  # Reproduce with scripts/measure_pose_stats.py
-  rot_weight: 5900.0
+  whiten: true           # whitened pose targets; see mvo/common/data/pose_stats.py
+  rot_weight: 1.0        # whitening makes the axes commensurate
 seq_len: 2
 batch_size: 16
 lr: 1.0e-4

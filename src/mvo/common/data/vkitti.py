@@ -1,7 +1,6 @@
 """Virtual KITTI 2 dataset. See the batch-dict contract below.
 
-OWNER: Pranav Joshi  (branch: base/dataset)
-STATUS: STUB -- implement on your branch.
+OWNER: Pranav Joshi
 
 The batch dict below is THE contract. All four models consume exactly this.
 Nobody writes their own loader.
@@ -119,16 +118,41 @@ class VKitti2(Dataset):
 
         K = m["K"].copy()
 
+        flipped = False
         if self.augment:
-            rng = np.random.default_rng(idx)
+            # NOT seeded from idx. Seeding per sample index freezes each
+            # sample's jitter and flip for the entire run, which makes
+            # augmentation a fixed corruption of the dataset rather than a
+            # regulariser. default_rng() draws fresh OS entropy, and DataLoader
+            # seeds each worker independently. Reproducibility of weight init
+            # and batch order still comes from set_seed() in the engine, and
+            # val/test always run with augment=False.
+            rng = np.random.default_rng()
             imgs = color_jitter(imgs, rng)
             if rng.random() < 0.5:
+                flipped = True
                 imgs = torch.flip(imgs, dims=[-1])
-                K[0, 2] = self.img_size[1] - K[0, 2]     # cx mirrors
+                # torch.flip maps pixel u -> W-1-u, so the mirrored
+                # principal point is (W-1) - cx, not W - cx. One pixel, but it
+                # is a constant bias in K that a photometric loss cannot correct.
+                K[0, 2] = (self.img_size[1] - 1) - K[0, 2]
                 from mvo.common.geometry import se3  # Abhishek's module
                 vec = se3.mat_to_vec(torch.from_numpy(rel_pose)).numpy()
                 vec = np.stack([hflip_pose(v) for v in vec])
                 rel_pose = se3.vec_to_mat(torch.from_numpy(vec)).numpy()
+
+        if flipped:
+            # A horizontal flip mirrors the camera frame, so the stored
+            # world-frame absolute poses stop agreeing with the mirrored
+            # rel_pose. Re-integrate them from the mirrored chain, anchored on
+            # the unchanged first pose, so the two stay consistent.
+            #
+            # Dropping the key instead would break collation: flipped and
+            # unflipped samples would carry different keys and default_collate
+            # raises KeyError on the first mixed batch.
+            abs_pose = abs_pose.copy()
+            for i in range(len(rel_pose)):
+                abs_pose[i + 1] = abs_pose[i] @ np.linalg.inv(rel_pose[i])
 
         out = {
             "imgs": normalize(imgs),
@@ -139,6 +163,7 @@ class VKitti2(Dataset):
             "seq_id": sid,
             "frame_idx": torch.tensor(frames, dtype=torch.long),
         }
+
         if self.need_depth:
             out["depth"] = torch.stack([self._load_depth(sid, f) for f in frames])
         return out

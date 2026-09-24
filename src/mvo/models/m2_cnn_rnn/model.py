@@ -34,6 +34,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as tvm
 
+from mvo.common.data.pose_stats import denormalize, normalize, pose_mean_std
 from mvo.common.geometry.se3 import mat_to_vec
 from mvo.common.train.base_model import BaseVOModel
 from mvo.common.train.registry import register
@@ -73,10 +74,15 @@ class M2CnnRnn(BaseVOModel):
 
     def __init__(self, rnn: str = "lstm", hidden_size: int = 512,
                  num_layers: int = 2, dropout: float = 0.2,
-                 rot_weight: float = 100.0, pretrained: bool = True, **kwargs):
+                 rot_weight: float = 1.0, pretrained: bool = True,
+                 whiten: bool = True, **kwargs):
         super().__init__()
         self.rnn_type = rnn.lower()
         self.rot_weight = rot_weight
+        self.whiten = bool(whiten)
+        _mean, _std = pose_mean_std()
+        self.register_buffer("pose_mean", _mean)
+        self.register_buffer("pose_std", _std)
 
         # ---- Backbone -------------------------------------------------------
         weights = tvm.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
@@ -145,19 +151,29 @@ class M2CnnRnn(BaseVOModel):
             feats, _ = self.rnn(feats)                # (B, S-1, hidden_size)
 
         # 6-DoF pose per step
-        pose = self.pose_head(feats)                  # (B, S-1, 6)
+        raw = self.pose_head(feats)                   # (B, S-1, 6)
+        # Head predicts a whitened pose; the contract requires a metric one.
+        pose = denormalize(raw, self.pose_mean, self.pose_std) if self.whiten else raw
         return {"pose": pose}
 
     def compute_loss(self, batch: dict, out: dict) -> dict:
         """DeepVO-style weighted MSE.  L = ||t̂-t||² + k*||r̂-r||²
 
         GT rel_pose is (B, S-1, 4, 4); convert to 6-vec via mat_to_vec.
-        The rot_weight (~100) compensates for axis-angle magnitudes being tiny
-        between adjacent frames vs. translation magnitudes in metres.
+        With whiten=True the six axes are already commensurate and rot_weight
+        is 1. Without it, k must be measured rather than copied from the paper:
+        E[t^2]/E[r^2] is about 5869 on this data, not the 100 DeepVO used.
         """
         pose_pred = out["pose"]                        # (B, S-1, 6)
         rel_mat = batch["rel_pose"].to(pose_pred.dtype)  # (B, S-1, 4, 4)
         pose_gt = mat_to_vec(rel_mat)                  # (B, S-1, 6)
+
+        if self.whiten:
+            # Per-axis variance spans 424x on this data: a plain MSE sends
+            # 99.89% of its gradient to tz and trains forward translation
+            # alone. Whitening equalises the six axes.
+            pose_pred = normalize(pose_pred, self.pose_mean, self.pose_std)
+            pose_gt = normalize(pose_gt, self.pose_mean, self.pose_std)
 
         t_err = (pose_pred[..., :3] - pose_gt[..., :3]).pow(2).mean()
         r_err = (pose_pred[..., 3:] - pose_gt[..., 3:]).pow(2).mean()

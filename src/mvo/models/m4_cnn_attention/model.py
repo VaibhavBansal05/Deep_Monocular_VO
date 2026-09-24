@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 from torchvision.models import ResNet18_Weights, ResNet34_Weights, resnet18, resnet34
 
+from mvo.common.data.pose_stats import denormalize, normalize, pose_mean_std
 from mvo.common.geometry import se3
 from mvo.common.train.base_model import BaseVOModel
 from mvo.common.train.registry import register
@@ -94,7 +95,7 @@ class AttentionVO(BaseVOModel):
     def __init__(self, backbone: str = "resnet18", pretrained: bool = True,
                  attention: str = "none", reduction: int = 16,
                  spatial_kernel: int = 7, dropout: float = 0.2,
-                 rot_weight: float = 5900.0):
+                 rot_weight: float = 1.0, whiten: bool = True):
         super().__init__()
         if backbone not in _BACKBONES:
             raise ValueError(f"unknown backbone {backbone!r}; expected {list(_BACKBONES)}")
@@ -113,6 +114,10 @@ class AttentionVO(BaseVOModel):
 
         self.attention = attention
         self.rot_weight = float(rot_weight)
+        self.whiten = bool(whiten)
+        mean, std = pose_mean_std()
+        self.register_buffer("pose_mean", mean)
+        self.register_buffer("pose_std", std)
         self.stem = nn.Sequential(net.conv1, net.bn1, net.relu, net.maxpool)
         self.layer1, self.layer2 = net.layer1, net.layer2
         self.layer3, self.layer4 = net.layer3, net.layer4
@@ -137,24 +142,32 @@ class AttentionVO(BaseVOModel):
             raise ValueError(f"M4 expects seq_len={self.seq_len}, got {imgs.shape[1]}")
 
         pair = torch.cat([imgs[:, 0], imgs[:, 1]], dim=1)   # (B, 6, H, W)
-        pose = self.decoder(self.encode(pair))              # (B, 6)
+        raw = self.decoder(self.encode(pair))               # (B, 6)
+
+        # The head predicts a whitened pose; the contract requires a metric one.
+        # With the zero-initialised head this means the model starts by
+        # predicting the AVERAGE relative pose rather than the identity -- the
+        # mean-pose baseline scores t_rel 22.22% on Scene20 against the identity
+        # baseline's 99.16%, so it begins where the trivial predictor ends.
+        pose = denormalize(raw, self.pose_mean, self.pose_std) if self.whiten else raw
         return {"pose": pose.unsqueeze(1)}                  # (B, S-1, 6)
 
     def compute_loss(self, batch: dict, out: dict) -> dict:
-        pred = out["pose"]                                  # (B, 1, 6)
-        target = se3.mat_to_vec(batch["rel_pose"])          # (B, 1, 6)
+        pred = out["pose"]                                  # (B, 1, 6), metric
+        target = se3.mat_to_vec(batch["rel_pose"])          # (B, 1, 6), metric
+
+        if self.whiten:
+            # Per-axis variance spans 424x on this data, so a plain MSE sends
+            # 99.89% of its gradient to tz and trains forward translation
+            # alone. Whitening gives every axis an equal share.
+            pred = normalize(pred, self.pose_mean, self.pose_std)
+            target = normalize(target, self.pose_mean, self.pose_std)
 
         trans = ((pred[..., :3] - target[..., :3]) ** 2).mean()
         rot = ((pred[..., 3:] - target[..., 3:]) ** 2).mean()
 
-        # Rotation and translation live on wildly different scales, so an
-        # unweighted sum is dominated by translation and the model learns to
-        # predict a straight line. DeepVO introduces a weight k for this.
-        #
-        # k is measured, not guessed. Over the training split the variance of
-        # the targets is trans 2.00e-1 vs rot 3.41e-5, a ratio of ~5900:1, so
-        # k=5900 puts the two terms on equal footing at initialisation.
-        # DeepVO's published k=100 was tuned for KITTI's scale convention and
-        # leaves rotation ~59x under-weighted here.
-        # Reproduce with: scripts/measure_pose_stats.py
+        # Once whitened, translation and rotation are already commensurate, so
+        # rot_weight defaults to 1. It is retained for the unwhitened path,
+        # where DeepVO's k is needed and must be measured rather than copied:
+        # E[t^2]/E[r^2] is about 5869 here, not the 100 the paper used.
         return {"total": trans + self.rot_weight * rot, "trans": trans, "rot": rot}
