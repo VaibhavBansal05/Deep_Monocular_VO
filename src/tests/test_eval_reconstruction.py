@@ -58,6 +58,29 @@ def test_sequence_reconstruction_recovers_each_transition_once():
     assert rel.shape == (20, 4, 4), f"expected 20 transitions, got {rel.shape[0]}"
 
 
+def test_reconstruction_uses_the_most_recent_timestep_of_each_window():
+    """A recurrent model's later timesteps carry more context, so the last
+    element of each window must be the one kept. Keeping element 0 would
+    evaluate a sequence model as if it had no recurrence at all."""
+    seq_len = 5
+    n_windows = 6
+    # window w, element e -> a unique marker so the source of each output is
+    # identifiable in the reconstruction
+    windows = [torch.full((1, seq_len - 1, 6), 0.0) for _ in range(n_windows)]
+    for w in range(n_windows):
+        for e in range(seq_len - 1):
+            windows[w][0, e, :] = w * 10 + e
+
+    rel, _ = predict_sequence(_Replay(windows), _loader(windows), torch.device("cpu"))
+    assert rel.shape[0] == (seq_len - 2) + n_windows
+
+    from mvo.common.geometry import se3
+    got = se3.mat_to_vec(torch.from_numpy(rel).double())[:, 0].round()
+    # leading S-2 from window 0, then the LAST element of every window
+    expected = [0.0, 1.0, 2.0] + [w * 10 + (seq_len - 2) for w in range(n_windows)]
+    assert got.tolist() == expected, f"{got.tolist()} != {expected}"
+
+
 def test_reconstruction_matches_the_underlying_poses():
     """Each recovered transition must be the one that window predicted."""
     from mvo.common.geometry import se3
@@ -66,6 +89,8 @@ def test_reconstruction_matches_the_underlying_poses():
     w = [x.double() for x in _windows_from_truth(truth, seq_len=5)]
     rel, _ = predict_sequence(_Replay(w), _loader(w), torch.device("cpu"))
 
+    # A perfect model emits the true transitions in every window, so whichever
+    # element is kept the reconstruction must equal the truth.
     expected = se3.vec_to_mat(truth).numpy()
     assert rel.shape == expected.shape
     # predict_sequence casts to float32 deliberately, so compare at float32

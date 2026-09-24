@@ -50,11 +50,17 @@ def predict_sequence(model, loader, device) -> tuple[np.ndarray, float]:
     trajectory needs 836, and integrating them produces a trajectory roughly
     four times too long.
 
-    To reconstruct the trajectory exactly once, take the FIRST predicted pose
-    of each window -- the (i, i+1) transition -- and then the remaining
-    transitions from the final window:
+    Each transition must therefore be taken from exactly one window, and for a
+    recurrent model it matters WHICH. Window i predicts its S-1 transitions in
+    order, so element 0 has seen a single frame pair and carries no temporal
+    context at all, while element S-2 has the full window behind it. Taking
+    element 0 would evaluate a sequence model as if it were pairwise and throw
+    away the recurrence the model exists to provide.
 
-        (N - S + 1) + (S - 2) = N - 1
+    So take the LAST element of every window, which covers transitions
+    S-2 .. N-2, and recover the leading S-2 transitions from the first window:
+
+        (S - 2) + (N - S + 1) = N - 1
     """
     model.eval()
     per_window, n_frames = [], 0
@@ -64,13 +70,17 @@ def predict_sequence(model, loader, device) -> tuple[np.ndarray, float]:
         out = model(batch)
         pose = out["pose"].float().cpu()          # (B, S-1, 6)
         per_window.append(pose)
-        n_frames += pose.shape[0] * pose.shape[1]
+        # One transition per window is retained, so timing per retained frame
+        # is per window, not per predicted pose.
+        n_frames += pose.shape[0]
     ms = (time.time() - t0) * 1000.0 / max(n_frames, 1)
 
     poses = torch.cat(per_window, dim=0)          # (n_windows, S-1, 6)
-    first = poses[:, 0]                           # one transition per window
-    tail = poses[-1, 1:]                          # finish the last window
-    vec = torch.cat([first, tail], dim=0) if tail.numel() else first
+    if poses.shape[1] == 1:                       # pairwise model
+        vec = poses[:, 0]
+    else:
+        head = poses[0, :-1]                      # leading S-2 transitions
+        vec = torch.cat([head, poses[:, -1]], dim=0)
     return se3.vec_to_mat(vec).numpy(), ms
 
 

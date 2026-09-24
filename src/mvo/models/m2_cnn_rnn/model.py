@@ -75,9 +75,12 @@ class M2CnnRnn(BaseVOModel):
     def __init__(self, rnn: str = "lstm", hidden_size: int = 512,
                  num_layers: int = 2, dropout: float = 0.2,
                  rot_weight: float = 1.0, pretrained: bool = True,
-                 whiten: bool = True, **kwargs):
+                 whiten: bool = True, seq_len: int = 5, **kwargs):
         super().__init__()
         self.rnn_type = rnn.lower()
+        if seq_len < 2:
+            raise ValueError(f"seq_len must be >= 2, got {seq_len}")
+        self.seq_len = int(seq_len)
         self.rot_weight = rot_weight
         self.whiten = bool(whiten)
         _mean, _std = pose_mean_std()

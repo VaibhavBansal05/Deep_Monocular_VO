@@ -1,5 +1,6 @@
 # Model 2 -- CNN (ResNet18) + GRU/LSTM.  OWNER: Abhishek Laxman Jadhav
 model:
+  seq_len: 5
   backbone: resnet18
   pretrained: true
   rnn: lstm              # lstm | gru | none  (none = ablation)
@@ -8,7 +9,6 @@ model:
   dropout: 0.2
   whiten: true           # whitened pose targets; see mvo/common/data/pose_stats.py
   rot_weight: 1.0        # whitening makes the axes commensurate
-seq_len: 5
 batch_size: 8
 lr: 1.0e-4
 epochs: 60

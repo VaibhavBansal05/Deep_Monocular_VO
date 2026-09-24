@@ -95,7 +95,8 @@ class AttentionVO(BaseVOModel):
     def __init__(self, backbone: str = "resnet18", pretrained: bool = True,
                  attention: str = "none", reduction: int = 16,
                  spatial_kernel: int = 7, dropout: float = 0.2,
-                 rot_weight: float = 1.0, whiten: bool = True):
+                 rot_weight: float = 1.0, whiten: bool = True,
+                 seq_len: int = 2):
         super().__init__()
         if backbone not in _BACKBONES:
             raise ValueError(f"unknown backbone {backbone!r}; expected {list(_BACKBONES)}")
@@ -112,6 +113,9 @@ class AttentionVO(BaseVOModel):
         # Two stacked RGB frames -> 6 input channels.
         net.conv1 = _inflate_conv1(net.conv1, 6)
 
+        if seq_len != 2:
+            raise ValueError("M4 is a pairwise model; seq_len must be 2")
+        self.seq_len = int(seq_len)
         self.attention = attention
         self.rot_weight = float(rot_weight)
         self.whiten = bool(whiten)

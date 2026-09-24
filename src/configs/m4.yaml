@@ -1,5 +1,6 @@
 # Model 4 -- CNN + CBAM/SE attention.  OWNER: Vaibhav Krishna Bansal
 model:
+  seq_len: 2
   backbone: resnet18
   pretrained: true
   # none is the ablation baseline and trains today; cbam/se land on m4/cbam.
@@ -10,7 +11,6 @@ model:
   dropout: 0.2
   whiten: true           # whitened pose targets; see mvo/common/data/pose_stats.py
   rot_weight: 1.0        # whitening makes the axes commensurate
-seq_len: 2
 batch_size: 16
 lr: 1.0e-4
 epochs: 60
