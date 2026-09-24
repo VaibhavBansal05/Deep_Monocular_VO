@@ -26,6 +26,7 @@ def test_hflip_flips_only_tx_ry_rz():
 
 def _train_ds(**kw):
     import pytest
+
     from mvo.common.data.vkitti import VKitti2
     try:
         return VKitti2(root="data/vkitti2", split="train", seq_len=2, **kw)
