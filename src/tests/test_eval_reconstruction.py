@@ -1,0 +1,73 @@
+"""The trajectory reconstruction in scripts/eval.py.
+
+Regression test for a defect that silently invalidated every sequence model's
+metrics: the dataset yields stride-1 sliding windows, so concatenating all S-1
+predicted poses per window counts each transition S-1 times.
+"""
+
+import sys
+from pathlib import Path
+
+import torch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from eval import predict_sequence  # noqa: E402
+
+
+class _Replay:
+    """Returns pre-set poses, so reconstruction is tested in isolation."""
+
+    def __init__(self, windows):
+        self.windows = list(windows)
+        self.i = 0
+
+    def eval(self):
+        pass
+
+    def __call__(self, batch):
+        out = self.windows[self.i]
+        self.i += 1
+        return {"pose": out}
+
+
+def _windows_from_truth(rel_vecs, seq_len):
+    """Build the windows a perfect model would emit for a stride-1 loader."""
+    n_windows = len(rel_vecs) - seq_len + 2
+    return [rel_vecs[i:i + seq_len - 1].unsqueeze(0) for i in range(n_windows)]
+
+
+def _loader(windows):
+    """Stand-in for the DataLoader: predict_sequence expects batch dicts."""
+    return [{"imgs": torch.zeros(1)} for _ in windows]
+
+
+def test_pairwise_reconstruction_is_exact():
+    truth = torch.randn(20, 6) * 0.05
+    w = _windows_from_truth(truth, seq_len=2)
+    rel, _ = predict_sequence(_Replay(w), _loader(w), torch.device("cpu"))
+    assert rel.shape == (20, 4, 4)
+
+
+def test_sequence_reconstruction_recovers_each_transition_once():
+    """seq_len=5 over 20 transitions must yield 20, not 4x that."""
+    truth = torch.randn(20, 6) * 0.05
+    w = _windows_from_truth(truth, seq_len=5)
+    assert len(w) == 17 and w[0].shape == (1, 4, 6)
+
+    rel, _ = predict_sequence(_Replay(w), _loader(w), torch.device("cpu"))
+    assert rel.shape == (20, 4, 4), f"expected 20 transitions, got {rel.shape[0]}"
+
+
+def test_reconstruction_matches_the_underlying_poses():
+    """Each recovered transition must be the one that window predicted."""
+    from mvo.common.geometry import se3
+
+    truth = torch.randn(20, 6).double() * 0.05
+    w = [x.double() for x in _windows_from_truth(truth, seq_len=5)]
+    rel, _ = predict_sequence(_Replay(w), _loader(w), torch.device("cpu"))
+
+    expected = se3.vec_to_mat(truth).numpy()
+    assert rel.shape == expected.shape
+    # predict_sequence casts to float32 deliberately, so compare at float32
+    # precision rather than float64.
+    assert abs(rel - expected).max() < 1e-6
