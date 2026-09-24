@@ -16,11 +16,11 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+from scipy.spatial.transform import Rotation
 
 from mvo.common.data import splits
 from mvo.common.io.trajectory import read_tum
 from mvo.common.metrics.ate import umeyama
-from scipy.spatial.transform import Rotation
 
 SEQ = "Scene20/clone"
 STRIDE = 3           # every 3rd frame keeps the sheet ~1.5 MB
