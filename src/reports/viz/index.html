@@ -1,0 +1,537 @@
+<title>Odometry Drift Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+  :root {
+    --ground:   #F7F5F1;
+    --surface:  #FFFFFF;
+    --sunken:   #ECE9E3;
+    --line:     #D8D3CA;
+    --text:     #1A2129;
+    --muted:    #6C7A88;
+    --faint:    #9AA6B2;
+
+    --gt:       #B4761A;
+    --m2:       #12798F;
+    --m4:       #8B3FB0;
+    --base:     #8A96A2;
+    --alert:    #C0442F;
+
+    --grid-3d:  #CFCAC1;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --r: 6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0F1419;
+      --surface: #171E26;
+      --sunken:  #101720;
+      --line:    #28323D;
+      --text:    #E4E9EF;
+      --muted:   #8695A3;
+      --faint:   #5C6975;
+      --gt:      #F2B441;
+      --m2:      #4FC3D9;
+      --m4:      #C77DE0;
+      --base:    #5A6672;
+      --alert:   #E8695B;
+      --grid-3d: #24303B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #0F1419;  --surface: #171E26;  --sunken: #101720;
+    --line:    #28323D;  --text:    #E4E9EF;  --muted:  #8695A3;
+    --faint:   #5C6975;  --gt:      #F2B441;  --m2:     #4FC3D9;
+    --m4:      #C77DE0;  --base:    #5A6672;  --alert:  #E8695B;
+    --grid-3d: #24303B;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--text);
+    font-family: var(--sans); font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 0 16px; padding-block: 20px 40px; }
+
+  header.masthead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px; margin-bottom: 4px; }
+  h1 { font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+  .seq { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .sub { color: var(--muted); font-size: 13px; margin: 2px 0 18px; max-width: 68ch; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .chip {
+    display: flex; align-items: baseline; gap: 7px; padding: 6px 11px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  }
+  .chip b { font-family: var(--mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .chip span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; align-self: center; }
+
+  .console { display: grid; grid-template-columns: minmax(0,1.85fr) minmax(0,1fr); gap: 14px; }
+  @media (max-width: 900px) { .console { grid-template-columns: minmax(0,1fr); } }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .panel > h2 {
+    margin: 0; padding: 9px 12px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+    border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px;
+  }
+  .panel > h2 em { font-style: normal; font-family: var(--mono); color: var(--faint); text-transform: none; letter-spacing: 0; }
+
+  #scene { display: block; width: 100%; height: 440px; touch-action: none; cursor: grab; background: var(--sunken); }
+  #scene:active { cursor: grabbing; }
+  @media (max-width: 900px) { #scene { height: 320px; } }
+
+  .rightcol { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  #film { display: block; width: 100%; background: #000; aspect-ratio: 1242 / 375; }
+  #drift, #curves { display: block; width: 100%; height: 150px; }
+
+  .transport { display: flex; align-items: center; gap: 12px; padding: 10px 12px; flex-wrap: wrap; }
+  button.play {
+    font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    padding: 7px 14px; min-width: 76px; cursor: pointer; color: var(--ground);
+    background: var(--text); border: 1px solid var(--text); border-radius: 4px;
+  }
+  button.play:hover { opacity: .86; }
+  input[type=range] { flex: 1 1 200px; min-width: 140px; accent-color: var(--gt); }
+  .frameno { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--line); }
+  .tog {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 4px; background: transparent;
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  }
+  .tog[aria-pressed="true"] { color: var(--text); background: var(--sunken); border-color: var(--faint); }
+  .tog:focus-visible, button.play:focus-visible, .tog:focus { outline: 2px solid var(--gt); outline-offset: 2px; }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 8px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  tbody td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: none; }
+  tr.baseline td { color: var(--muted); }
+  tr.baseline td:first-child { font-style: italic; }
+  .best { color: var(--gt); font-weight: 600; }
+
+  .notes { margin-top: 26px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .note { border-left: 2px solid var(--line); padding: 2px 0 2px 13px; }
+  .note h3 { margin: 0 0 5px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .note p { margin: 0; font-size: 13px; color: var(--text); }
+  .note.flag { border-left-color: var(--alert); }
+  code { font-family: var(--mono); font-size: .92em; background: var(--sunken); padding: 1px 4px; border-radius: 3px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <h1>Odometry Drift Console</h1>
+    <span class="seq" id="seqname">—</span>
+  </header>
+  <p class="sub">
+    Estimated camera trajectories against ground truth on the held-out test sequence.
+    Predictions are sim(3)-aligned for display, exactly as the ATE metric aligns them.
+    Drag to orbit; scrub to move the camera, the footage and the error trace together.
+  </p>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="console">
+    <div class="panel">
+      <h2>Camera path <em id="viewhint">drag to orbit · scroll to zoom</em></h2>
+      <canvas id="scene"></canvas>
+      <div class="transport">
+        <button class="play" id="play" type="button">PLAY</button>
+        <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="Frame">
+        <span class="frameno" id="frameno">frame 0</span>
+      </div>
+      <div class="toggles" id="toggles"></div>
+    </div>
+
+    <div class="rightcol">
+      <div class="panel">
+        <h2>Sequence <em id="filmhint">Camera_0</em></h2>
+        <canvas id="film"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Position error <em>metres vs distance travelled</em></h2>
+        <canvas id="drift"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>Comparison <em>test split</em></h2>
+      <div class="tablewrap"><table id="metrics"></table></div>
+    </div>
+    <div class="panel">
+      <h2>Training <em>whitened loss units</em></h2>
+      <canvas id="curves"></canvas>
+    </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var D = null, N = 0, cur = 0, playing = false, timer = null;
+  var COL = {}, show = { gt: true, m2: true, m4: true };
+  var sheet = new Image();
+
+  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function readColors() {
+    COL = { gt: css("--gt"), m2: css("--m2"), m4: css("--m4"), base: css("--base"),
+            line: css("--line"), text: css("--text"), muted: css("--muted"),
+            faint: css("--faint"), grid: css("--grid-3d"), surface: css("--sunken") };
+  }
+
+  /* ---------------------------------------------------------------- 3D */
+  var renderer, scene, cam3, lines = {}, frusta = {}, grid, target = new THREE.Vector3();
+  var orbit = { az: 0.72, el: 0.42, dist: 1, down: false, x: 0, y: 0 };
+
+  function frustum(color) {
+    // A camera is drawn as the pyramid it sees through: apex at the optical
+    // centre, base spanning the 1242x375 image plane.
+    var d = 6, w = d * 1.24, h = d * 0.38;
+    var p = [[0,0,0],[ w, h,-d],[-w, h,-d],[-w,-h,-d],[ w,-h,-d]];
+    var e = [[0,1],[0,2],[0,3],[0,4],[1,2],[2,3],[3,4],[4,1]];
+    var v = [];
+    e.forEach(function (s) { v.push.apply(v, p[s[0]]); v.push.apply(v, p[s[1]]); });
+    var g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
+    return new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: color }));
+  }
+
+  function polyline(pts, color, width) {
+    var g = new THREE.BufferGeometry();
+    var f = new Float32Array(pts.length * 3);
+    for (var i = 0; i < pts.length; i++) { f[i*3] = pts[i][0]; f[i*3+1] = pts[i][1]; f[i*3+2] = pts[i][2]; }
+    g.setAttribute("position", new THREE.BufferAttribute(f, 3));
+    return new THREE.Line(g, new THREE.LineBasicMaterial({ color: color, linewidth: width || 1 }));
+  }
+
+  function init3D() {
+    var cv = document.getElementById("scene");
+    renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: false });
+    scene = new THREE.Scene();
+    cam3 = new THREE.PerspectiveCamera(46, 1, 0.5, 8000);
+
+    var all = D.gt.p, c = [0,0,0], i;
+    for (i = 0; i < all.length; i++) { c[0]+=all[i][0]; c[1]+=all[i][1]; c[2]+=all[i][2]; }
+    c = c.map(function (v) { return v / all.length; });
+    target.set(c[0], c[1], c[2]);
+    var span = 0;
+    for (i = 0; i < all.length; i++) {
+      span = Math.max(span, Math.hypot(all[i][0]-c[0], all[i][1]-c[1], all[i][2]-c[2]));
+    }
+    orbit.dist = span * 2.6;
+
+    grid = new THREE.GridHelper(span * 5, 26, COL.grid, COL.grid);
+    grid.position.set(c[0], Math.min.apply(null, all.map(function (p) { return p[1]; })) - 2, c[2]);
+    scene.add(grid);
+
+    lines.gt = polyline(D.gt.p, COL.gt, 2); scene.add(lines.gt);
+    frusta.gt = frustum(COL.gt); scene.add(frusta.gt);
+    Object.keys(D.models).forEach(function (k) {
+      lines[k] = polyline(D.models[k].p, COL[k] || COL.base); scene.add(lines[k]);
+      frusta[k] = frustum(COL[k] || COL.base); scene.add(frusta[k]);
+    });
+
+    bindOrbit(cv);
+    resize3D();
+    window.addEventListener("resize", function () { resize3D(); drawAll(); });
+  }
+
+  function resize3D() {
+    var cv = document.getElementById("scene");
+    var w = cv.clientWidth || 600, h = cv.clientHeight || 400;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(w, h, false);
+    cam3.aspect = w / h; cam3.updateProjectionMatrix();
+  }
+
+  function bindOrbit(cv) {
+    function dn(e) { orbit.down = true; orbit.x = (e.touches ? e.touches[0] : e).clientX; orbit.y = (e.touches ? e.touches[0] : e).clientY; }
+    function mv(e) {
+      if (!orbit.down) return;
+      var t = e.touches ? e.touches[0] : e;
+      orbit.az -= (t.clientX - orbit.x) * 0.008;
+      orbit.el = Math.max(-1.45, Math.min(1.45, orbit.el + (t.clientY - orbit.y) * 0.008));
+      orbit.x = t.clientX; orbit.y = t.clientY;
+      if (e.cancelable) e.preventDefault();
+      render3D();
+    }
+    function up() { orbit.down = false; }
+    cv.addEventListener("mousedown", dn); window.addEventListener("mousemove", mv); window.addEventListener("mouseup", up);
+    cv.addEventListener("touchstart", dn, { passive: true }); cv.addEventListener("touchmove", mv, { passive: false }); cv.addEventListener("touchend", up);
+    cv.addEventListener("wheel", function (e) {
+      orbit.dist = Math.max(20, Math.min(6000, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9)));
+      e.preventDefault(); render3D();
+    }, { passive: false });
+  }
+
+  function placeFrustum(obj, src, i) {
+    if (!src.p[i]) { obj.visible = false; return; }
+    obj.position.set(src.p[i][0], src.p[i][1], src.p[i][2]);
+    var q = src.q && src.q[i];
+    if (q) obj.quaternion.set(q[0], q[1], q[2], q[3]);
+  }
+
+  function render3D() {
+    if (!renderer) return;
+    var ce = Math.cos(orbit.el), se = Math.sin(orbit.el);
+    cam3.position.set(
+      target.x + orbit.dist * ce * Math.sin(orbit.az),
+      target.y + orbit.dist * se,
+      target.z + orbit.dist * ce * Math.cos(orbit.az));
+    cam3.lookAt(target);
+    scene.background = new THREE.Color(COL.surface);
+    lines.gt.visible = frusta.gt.visible = show.gt;
+    placeFrustum(frusta.gt, D.gt, cur);
+    Object.keys(D.models).forEach(function (k) {
+      lines[k].visible = frusta[k].visible = !!show[k];
+      if (show[k]) placeFrustum(frusta[k], D.models[k], cur);
+    });
+    renderer.render(scene, cam3);
+  }
+
+  /* -------------------------------------------------------------- film */
+  function drawFilm() {
+    var cv = document.getElementById("film"), s = D.sprite;
+    var w = cv.clientWidth || 400, h = Math.round(w * s.tileH / s.tileW);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(w*dpr)) { cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+    cv.style.height = h + "px";
+    var g = cv.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+    if (!sheet.complete || !sheet.naturalWidth) return;
+    var idx = Math.min(s.count - 1, Math.floor(cur / s.stride));
+    g.drawImage(sheet, (idx % s.cols) * s.tileW, Math.floor(idx / s.cols) * s.tileH,
+                s.tileW, s.tileH, 0, 0, w, h);
+  }
+
+  /* ------------------------------------------------------------- charts */
+  function prep(cv, hpx) {
+    var w = cv.clientWidth || 300, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(w*dpr)) { cv.width = Math.round(w*dpr); cv.height = Math.round(hpx*dpr); }
+    var g = cv.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, hpx);
+    return { g: g, w: w, h: hpx };
+  }
+
+  function axes(g, w, h, pad, xl, yl) {
+    g.strokeStyle = COL.line; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(pad.l, pad.t); g.lineTo(pad.l, h - pad.b); g.lineTo(w - pad.r, h - pad.b); g.stroke();
+    g.fillStyle = COL.muted; g.font = '10px "IBM Plex Mono", monospace';
+    g.textAlign = "right"; g.fillText(yl, w - pad.r, pad.t + 9);
+    g.textAlign = "left"; g.fillText(xl, pad.l, h - 3);
+  }
+
+  function drawDrift() {
+    var c = prep(document.getElementById("drift"), 150), g = c.g;
+    var pad = { l: 40, r: 10, t: 12, b: 20 };
+    var keys = Object.keys(D.models).filter(function (k) { return show[k]; });
+    var maxE = 1, maxD = 1;
+    keys.forEach(function (k) {
+      D.models[k].drift.forEach(function (p) { maxE = Math.max(maxE, p.err); maxD = Math.max(maxD, p.dist); });
+    });
+    var X = function (d) { return pad.l + (d / maxD) * (c.w - pad.l - pad.r); };
+    var Y = function (e) { return c.h - pad.b - (e / maxE) * (c.h - pad.t - pad.b); };
+
+    for (var i = 1; i <= 3; i++) {
+      var yy = Y(maxE * i / 3);
+      g.strokeStyle = COL.line; g.globalAlpha = .55; g.beginPath();
+      g.moveTo(pad.l, yy); g.lineTo(c.w - pad.r, yy); g.stroke(); g.globalAlpha = 1;
+      g.fillStyle = COL.faint; g.font = '10px "IBM Plex Mono", monospace'; g.textAlign = "right";
+      g.fillText(Math.round(maxE * i / 3), pad.l - 5, yy + 3);
+    }
+    keys.forEach(function (k) {
+      g.strokeStyle = COL[k] || COL.base; g.lineWidth = 1.8; g.beginPath();
+      D.models[k].drift.forEach(function (p, j) { j ? g.lineTo(X(p.dist), Y(p.err)) : g.moveTo(X(p.dist), Y(p.err)); });
+      g.stroke();
+    });
+    var gt = D.gt.p, dist = 0;
+    for (var j = 1; j <= cur && j < gt.length; j++) {
+      dist += Math.hypot(gt[j][0]-gt[j-1][0], gt[j][1]-gt[j-1][1], gt[j][2]-gt[j-1][2]);
+    }
+    g.strokeStyle = COL.text; g.globalAlpha = .5; g.lineWidth = 1; g.beginPath();
+    g.moveTo(X(dist), pad.t); g.lineTo(X(dist), c.h - pad.b); g.stroke(); g.globalAlpha = 1;
+    axes(g, c.w, c.h, pad, Math.round(maxD) + " m travelled", "err m");
+  }
+
+  function drawCurves() {
+    var c = prep(document.getElementById("curves"), 150), g = c.g;
+    var pad = { l: 40, r: 10, t: 12, b: 20 };
+    var series = [];
+    Object.keys(D.models).forEach(function (k) {
+      var h = D.models[k].history;
+      if (h && h.length) {
+        series.push({ k: k, key: "train", pts: h.map(function (r) { return [r.epoch, r.train]; }), dash: [] });
+        series.push({ k: k, key: "val", pts: h.map(function (r) { return [r.epoch, r.val]; }), dash: [3,3] });
+      }
+    });
+    if (!series.length) {
+      g.fillStyle = COL.muted; g.font = '12px "IBM Plex Sans", sans-serif'; g.textAlign = "center";
+      g.fillText("No training history exported yet", c.w / 2, c.h / 2);
+      return;
+    }
+    var maxY = 0, maxX = 0;
+    series.forEach(function (s) { s.pts.forEach(function (p) { maxY = Math.max(maxY, p[1]); maxX = Math.max(maxX, p[0]); }); });
+    var X = function (e) { return pad.l + (e / Math.max(maxX,1)) * (c.w - pad.l - pad.r); };
+    var Y = function (v) { return c.h - pad.b - (v / maxY) * (c.h - pad.t - pad.b); };
+    // 1.0 is the reference: in whitened units that is the loss of predicting the mean
+    if (maxY > 1) {
+      g.strokeStyle = COL.base; g.setLineDash([2,3]); g.beginPath();
+      g.moveTo(pad.l, Y(1)); g.lineTo(c.w - pad.r, Y(1)); g.stroke(); g.setLineDash([]);
+      g.fillStyle = COL.faint; g.font = '10px "IBM Plex Mono", monospace'; g.textAlign = "left";
+      g.fillText("1.0 = predict the mean", pad.l + 4, Y(1) - 4);
+    }
+    series.forEach(function (s) {
+      g.strokeStyle = COL[s.k] || COL.base; g.lineWidth = s.key === "val" ? 1.8 : 1.2;
+      g.globalAlpha = s.key === "val" ? 1 : .5;
+      g.setLineDash(s.dash); g.beginPath();
+      s.pts.forEach(function (p, j) { j ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])); });
+      g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+    });
+    axes(g, c.w, c.h, pad, "epoch", "loss");
+  }
+
+  /* -------------------------------------------------------------- table */
+  var COLS = [
+    ["ate_sim3", "ATE sim(3) m", 3], ["ate_se3", "ATE SE(3) m", 3],
+    ["rpe_trans_rmse", "RPE trans m", 4], ["rpe_rot_rmse_deg", "RPE rot °", 4],
+    ["t_rel_pct", "t_rel %", 2], ["r_rel_deg_per_100m", "r_rel °/100m", 3]
+  ];
+
+  function buildTable() {
+    var rows = [], k;
+    for (k in D.metrics) rows.push({ id: k, name: D.models[k] ? D.models[k].label : k, m: D.metrics[k], base: false });
+    var order = ["train_mean", "oracle_mean", "identity"];
+    var nice = { train_mean: "baseline · constant mean motion", oracle_mean: "baseline · sequence mean (oracle)", identity: "baseline · stationary camera" };
+    order.forEach(function (b) { if (D.baselines[b]) rows.push({ id: b, name: nice[b], m: D.baselines[b], base: true }); });
+
+    var best = {};
+    COLS.forEach(function (c) {
+      var v = rows.filter(function (r) { return !r.base && typeof r.m[c[0]] === "number"; }).map(function (r) { return r.m[c[0]]; });
+      if (v.length) best[c[0]] = Math.min.apply(null, v);
+    });
+
+    var h = "<thead><tr><th>Model</th>" + COLS.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "</tr></thead><tbody>";
+    rows.forEach(function (r) {
+      h += '<tr class="' + (r.base ? "baseline" : "") + '"><td>' +
+           (r.base ? "" : '<span class="swatch" style="display:inline-block;background:' + (COL[r.id] || COL.base) + '"></span> ') +
+           r.name + "</td>";
+      COLS.forEach(function (c) {
+        var v = r.m[c[0]];
+        if (typeof v !== "number") { h += "<td>—</td>"; return; }
+        var hit = !r.base && best[c[0]] !== undefined && Math.abs(v - best[c[0]]) < 1e-9;
+        h += "<td" + (hit ? ' class="best"' : "") + ">" + v.toFixed(c[2]) + "</td>";
+      });
+      h += "</tr>";
+    });
+    document.getElementById("metrics").innerHTML = h + "</tbody>";
+  }
+
+  function buildChips() {
+    var c = [], m4 = D.metrics.m4, m2 = D.metrics.m2;
+    function chip(sw, val, lab) {
+      return '<div class="chip">' + (sw ? '<span class="swatch" style="background:' + sw + '"></span>' : "") +
+             "<b>" + val + "</b><span>" + lab + "</span></div>";
+    }
+    c.push(chip(COL.gt, D.gt.p.length, "frames"));
+    if (m4) c.push(chip(COL.m4, m4.t_rel_pct.toFixed(1) + "%", "M4 t_rel"));
+    if (m2) c.push(chip(COL.m2, m2.t_rel_pct.toFixed(1) + "%", "M2 t_rel"));
+    if (D.baselines.train_mean) c.push(chip(COL.base, D.baselines.train_mean.t_rel_pct.toFixed(1) + "%", "baseline t_rel"));
+    document.getElementById("chips").innerHTML = c.join("");
+  }
+
+  function buildToggles() {
+    var t = [{ id: "gt", label: "ground truth", col: COL.gt }];
+    Object.keys(D.models).forEach(function (k) { t.push({ id: k, label: D.models[k].label, col: COL[k] || COL.base }); });
+    var host = document.getElementById("toggles");
+    host.innerHTML = t.map(function (x) {
+      return '<button class="tog" type="button" data-id="' + x.id + '" aria-pressed="' + (show[x.id] ? "true" : "false") + '">' +
+             '<span class="swatch" style="background:' + x.col + '"></span>' + x.label + "</button>";
+    }).join("");
+    host.addEventListener("click", function (e) {
+      var b = e.target.closest(".tog"); if (!b) return;
+      var id = b.dataset.id;
+      show[id] = !show[id];
+      b.setAttribute("aria-pressed", show[id] ? "true" : "false");
+      drawAll();
+    });
+  }
+
+  var NOTES = [
+    ["flag", "Drift is bias, not noise", "Subtracting one constant offset per axis takes M4 from 37.9% to 17.7% t_rel and M2 from 44.7% to 20.5%. The residual is dominated by a near-constant per-frame error, which accumulates linearly."],
+    ["", "Why the bias exists", "An MSE model that cannot generalise hedges toward the average motion it saw in training. This sequence travels faster than that average, so nearly every frame is under-predicted by a similar amount."],
+    ["flag", "It cannot be calibrated away", "A per-axis correction fitted on validation and applied here made M4 worse — 37.9% to 65.8%. The bias is specific to the scene, not a fixed property of the model."],
+    ["", "Read the baselines first", "A constant-motion predictor using the training mean scores 48.75% t_rel. Both models beat it, but the gap to ground truth is mostly unclosed."]
+  ];
+
+  function buildNotes() {
+    document.getElementById("notes").innerHTML = NOTES.map(function (n) {
+      return '<div class="note ' + n[0] + '"><h3>' + n[1] + "</h3><p>" + n[2] + "</p></div>";
+    }).join("");
+  }
+
+  /* ------------------------------------------------------------ driving */
+  function setFrame(i) {
+    cur = Math.max(0, Math.min(N - 1, i));
+    document.getElementById("scrub").value = cur;
+    document.getElementById("frameno").textContent = "frame " + cur + " / " + (N - 1);
+    render3D(); drawFilm(); drawDrift();
+  }
+  function drawAll() { resize3D(); render3D(); drawFilm(); drawDrift(); drawCurves(); }
+
+  function toggle() {
+    playing = !playing;
+    document.getElementById("play").textContent = playing ? "PAUSE" : "PLAY";
+    if (timer) { clearInterval(timer); timer = null; }
+    if (playing) timer = setInterval(function () { setFrame(cur >= N - 1 ? 0 : cur + 2); }, 66);
+  }
+
+  function boot(data) {
+    D = data; N = D.gt.p.length;
+    readColors();
+    document.getElementById("seqname").textContent = D.sequence + " · held-out test";
+    document.getElementById("scrub").max = N - 1;
+    buildChips(); buildToggles(); buildTable(); buildNotes();
+    init3D();
+
+    sheet.onload = function () { drawFilm(); };
+    sheet.src = "frames.jpg";
+
+    document.getElementById("play").addEventListener("click", toggle);
+    document.getElementById("scrub").addEventListener("input", function (e) {
+      if (playing) toggle();
+      setFrame(parseInt(e.target.value, 10));
+    });
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    (mq.addEventListener ? mq.addEventListener.bind(mq, "change") : mq.addListener.bind(mq))(function () {
+      readColors();
+      if (grid) { grid.material.color = new THREE.Color(COL.grid); }
+      buildChips(); buildTable();
+      drawAll();
+    });
+    setFrame(0);
+    drawCurves();
+  }
+
+  fetch("data.json").then(function (r) { return r.json(); }).then(boot).catch(function (e) {
+    document.getElementById("chips").innerHTML =
+      '<div class="chip"><b>—</b><span>could not load data.json: ' + e.message + "</span></div>";
+  });
+})();
+</script>

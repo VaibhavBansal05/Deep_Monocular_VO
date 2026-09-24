@@ -9,8 +9,10 @@ in your own folder.
 """
 
 import argparse
+import sys
 from pathlib import Path
 
+import torch
 import yaml
 from torch.utils.data import DataLoader
 
@@ -28,6 +30,41 @@ def load_config(path: str) -> dict:
     cfg = yaml.safe_load(Path(path).read_text()) or {}
     base.update(cfg)
     return base
+
+
+def make_val_trajectory_hook(cfg, model, data_root):
+    """Score the validation sequence by ATE, not by per-frame loss.
+
+    Per-frame loss and trajectory error are not the same objective: a model can
+    have low per-frame error and still drift badly if its residual carries a
+    constant bias, which accumulates. Selecting on ATE targets what the project
+    is actually measured on.
+    """
+
+    from mvo.common.data import splits
+    from mvo.common.geometry import se3
+    from mvo.common.metrics.ate import ate
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from eval import predict_sequence
+
+    scene, variation = splits.sequences("val")[0]
+    sid = splits.seq_id(scene, variation)
+    ds = VKitti2(root=data_root, split="val", seq_len=model.seq_len,
+                 need_depth=model.needs_depth, augment=False)
+    gt = ds.absolute_poses(sid)
+    loader = DataLoader(ds, batch_size=cfg.get("batch_size", 8), shuffle=False,
+                        num_workers=cfg.get("num_workers", 2))
+
+    def hook(m):
+        device = next(m.parameters()).device
+        rel, _ = predict_sequence(m, loader, device)
+        pred = se3.relative_to_absolute(torch.from_numpy(rel)).numpy()
+        n = min(len(pred), len(gt))
+        return {"val_ate": float(ate(pred[:n, :3, 3], gt[:n, :3, 3],
+                                     with_scale=True)["rmse"])}
+
+    return hook
 
 
 def main() -> None:
@@ -72,8 +109,12 @@ def main() -> None:
     train_loader = DataLoader(train_ds, shuffle=True, **loader_kw)
     val_loader = DataLoader(val_ds, shuffle=False, **loader_kw)
 
+    val_hook = None
+    if cfg.get("selection_key", "total") != "total":
+        val_hook = make_val_trajectory_hook(cfg, model, args.data_root or cfg["data_root"])
+
     out_dir = Path(args.out or f"checkpoints/{args.model}")
-    trainer = Trainer(model, train_loader, val_loader, cfg, out_dir)
+    trainer = Trainer(model, train_loader, val_loader, cfg, out_dir, val_hook=val_hook)
     if args.resume:
         trainer.load(args.resume)
     trainer.fit()

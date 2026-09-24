@@ -36,7 +36,7 @@ def to_device(batch: dict, device: torch.device) -> dict:
 
 class Trainer:
     def __init__(self, model, train_loader: DataLoader, val_loader: DataLoader,
-                 cfg: dict, out_dir: str | Path):
+                 cfg: dict, out_dir: str | Path, val_hook=None):
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -55,6 +55,14 @@ class Trainer:
         self.optimizer = self._build_optimizer()
         self.scheduler = self._build_scheduler()
         self.scaler = torch.amp.GradScaler("cuda", enabled=self.amp)
+
+        # Per-frame validation loss is a poor selector here: validation is a
+        # single short sequence (232 samples), so the loss is noisy enough that
+        # an early lucky epoch can beat every later one -- M4 once selected
+        # epoch 2 of 25 that way. val_hook may return trajectory-level metrics,
+        # and selection_key chooses which to minimise.
+        self.val_hook = val_hook
+        self.selection_key = str(cfg.get("selection_key", "total"))
 
         self.csv = CSVLogger(self.out_dir / "history.csv")
         self.best_val = float("inf")
@@ -127,6 +135,8 @@ class Trainer:
         for epoch in range(self.start_epoch, self.epochs):
             tr = self._run_epoch(self.train_loader, train=True)
             va = self._run_epoch(self.val_loader, train=False)
+            if self.val_hook is not None:
+                va.update(self.val_hook(self.model))
             if self.scheduler is not None:
                 self.scheduler.step()
 
@@ -135,14 +145,18 @@ class Trainer:
                    **{f"val_{k}": v for k, v in va.items()},
                    "lr": self.optimizer.param_groups[0]["lr"]}
             self.csv.append(row)
-            log.info("epoch %3d | train %.5f | val %.5f | %.1fs",
-                     epoch, tr["total"], va["total"], tr["sec"])
+            extra = ""
+            if self.selection_key != "total" and self.selection_key in va:
+                extra = f" | {self.selection_key} {va[self.selection_key]:.4f}"
+            log.info("epoch %3d | train %.5f | val %.5f%s | %.1fs",
+                     epoch, tr["total"], va["total"], extra, tr["sec"])
 
             self.save("last.pt", epoch)
-            if va["total"] < self.best_val:
-                self.best_val = va["total"]
+            score = va.get(self.selection_key, va["total"])
+            if score < self.best_val:
+                self.best_val = score
                 self.save("best.pt", epoch)
-                log.info("  new best val loss %.5f", self.best_val)
+                log.info("  new best %s %.5f", self.selection_key, self.best_val)
 
         (self.out_dir / "summary.json").write_text(
             json.dumps({"best_val_loss": self.best_val,

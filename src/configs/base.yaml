@@ -10,8 +10,14 @@ num_workers: 4
 epochs: 30
 optimizer: adam
 lr: 1.0e-4
-weight_decay: 0.0
+# Train/val variance explained was 98.5% / 44%, i.e. heavy overfitting on ~1k
+# unique training frames, and weight decay was disabled entirely.
+weight_decay: 1.0e-4
 scheduler: cosine
+# Select checkpoints on validation ATE rather than per-frame loss. Validation
+# is one short sequence, so its per-frame loss is noisy enough that an early
+# epoch can win on chance: M4 previously selected epoch 2 of 25.
+selection_key: val_ate
 grad_clip: 1.0
 amp: true
 augment: true
