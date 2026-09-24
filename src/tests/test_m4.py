@@ -323,3 +323,31 @@ def test_whitened_loss_is_scale_free_across_axes():
         costs.append(float(m.compute_loss(b, {"pose": target + off})["total"]))
 
     assert max(costs) / min(costs) < 1.01, f"axis costs differ: {costs}"
+
+
+def test_pose_prior_keeps_only_forward_translation():
+    """Mean yaw rate is an artifact of which routes were in the training split,
+    not a physical prior. Train mean ry is +0.002353 against a test mean of
+    +0.000205 -- ten times the value it is meant to predict. Added to every
+    prediction it becomes a constant yaw, and a constant yaw integrates into a
+    circular arc: exactly M2's observed bow, whose ry bias of +0.002838 matches
+    the train/test offset.
+
+    Forward speed is different: vehicles do move forward, so that mean earns
+    its place.
+    """
+    from mvo.common.data.pose_stats import POSE_MEAN, POSE_MEAN_MEASURED
+
+    assert POSE_MEAN[2] == POSE_MEAN_MEASURED[2], "forward-speed prior must be kept"
+    for i, axis in ((0, "tx"), (1, "ty"), (3, "rx"), (4, "ry"), (5, "rz")):
+        assert POSE_MEAN[i] == 0.0, f"{axis} prior does not transfer and must be zero"
+
+
+def test_untrained_model_predicts_pure_forward_motion():
+    """Which makes the zero-initialised prediction 'drive straight ahead at a
+    typical speed' -- a prior that holds on any route."""
+    from mvo.common.data.pose_stats import POSE_MEAN
+
+    pose = _model(whiten=True)(_batch(b=2))["pose"][0, 0]
+    assert torch.allclose(pose, torch.tensor(POSE_MEAN), atol=1e-6)
+    assert pose[4].abs() < 1e-9, "no yaw at initialisation"
