@@ -37,6 +37,7 @@ Append one line per member per week. Terse is fine; consistency is the point.
 | 16 Sep | Suryansh | Implemented ATE/RPE/KITTI/depth metrics, TUM trajectory IO, comparison table and tests | #2 |
 | 22 Sep | Vaibhav | Reviewed and merged base PRs; fixed M4 pose scaling and rotation weight from measured statistics | m4/fix-pose-scaling |
 | 22 Sep | Vaibhav | Applied the same measured rotation weight to M2's config | fix/m2-rot-weight |
+| 24 Sep | Vaibhav | Literature review: 9-paper comparison table and per-member summaries | docs/literature-review |
 
 ## Sign-off
 
