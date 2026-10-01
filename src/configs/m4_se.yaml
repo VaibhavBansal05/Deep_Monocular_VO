@@ -1,0 +1,17 @@
+# M4 squeeze-and-excitation ablation; all non-attention settings match M4 CBAM.
+model:
+  seq_len: 2
+  backbone: resnet18
+  pretrained: true
+  attention: se
+  attention_residual: true
+  attention_gate_init: 0.1
+  reduction: 16
+  spatial_kernel: 7
+  dropout: 0.2
+  standardize: true
+  rot_weight: 1.0
+  bias_weight: 0.1
+batch_size: 16
+lr: 1.0e-4
+epochs: 60

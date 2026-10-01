@@ -11,7 +11,7 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from eval import predict_sequence  # noqa: E402
+from eval import predict_sequence, signed_pose_bias  # noqa: E402
 
 
 class _Replay:
@@ -96,3 +96,15 @@ def test_reconstruction_matches_the_underlying_poses():
     # predict_sequence casts to float32 deliberately, so compare at float32
     # precision rather than float64.
     assert abs(rel - expected).max() < 1e-6
+
+
+def test_signed_pose_bias_reports_translation_and_geodesic_rotation():
+    from mvo.common.geometry import se3
+
+    gt = torch.eye(4).repeat(3, 1, 1)
+    pred_vec = torch.zeros(3, 6)
+    pred_vec[:, 2] = 0.2
+    pred_vec[:, 4] = 0.01
+    bias = signed_pose_bias(se3.vec_to_mat(pred_vec), gt)
+    assert abs(bias["bias_tz_m"] - 0.2) < 1e-6
+    assert abs(bias["bias_ry_rad"] - 0.01) < 1e-6

@@ -53,13 +53,15 @@ def _read_intrinsics(path) -> np.ndarray:
 
 class VKitti2(Dataset):
     def __init__(self, root, split, seq_len=2, need_depth=False,
-                 augment=False, img_size=(128, 416)):
+                 augment=False, img_size=(128, 416), seed=42):
         self.root = Path(root)
         self.split = split
         self.seq_len = seq_len
         self.need_depth = need_depth
         self.augment = augment
         self.img_size = img_size
+        self.seed = int(seed)
+        self.epoch = 0
 
         self.samples = []          # (seq_id, start_frame)
         self.meta = {}             # seq_id -> {"K", "extrinsics", "dir"}
@@ -80,6 +82,14 @@ class VKitti2(Dataset):
 
     def __len__(self):
         return len(self.samples)
+
+    def set_epoch(self, epoch: int) -> None:
+        """Choose the deterministic augmentation stream for an epoch.
+
+        The tuple (base seed, epoch, sample index) is stable across reruns and
+        independent of DataLoader worker scheduling, but changes every epoch.
+        """
+        self.epoch = int(epoch)
 
     def _load_rgb(self, sid, frame) -> torch.Tensor:
         p = self.meta[sid]["dir"] / "frames" / "rgb" / splits.CAMERA / f"rgb_{frame:05d}.jpg"
@@ -120,14 +130,12 @@ class VKitti2(Dataset):
 
         flipped = False
         if self.augment:
-            # NOT seeded from idx. Seeding per sample index freezes each
-            # sample's jitter and flip for the entire run, which makes
-            # augmentation a fixed corruption of the dataset rather than a
-            # regulariser. default_rng() draws fresh OS entropy, and DataLoader
-            # seeds each worker independently. Reproducibility of weight init
-            # and batch order still comes from set_seed() in the engine, and
-            # val/test always run with augment=False.
-            rng = np.random.default_rng()
+            # Reproducible but not frozen: the same sample has the same
+            # transform within an epoch and a different stream next epoch.
+            # Deriving it from idx also makes results independent of which
+            # DataLoader worker happened to load the sample.
+            rng = np.random.default_rng(
+                np.random.SeedSequence([self.seed, self.epoch, int(idx)]))
             imgs = color_jitter(imgs, rng)
             if rng.random() < 0.5:
                 flipped = True

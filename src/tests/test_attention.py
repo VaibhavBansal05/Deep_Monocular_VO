@@ -54,13 +54,12 @@ def test_se_has_no_spatial_branch():
 
 
 @pytest.mark.parametrize("kind", ["cbam", "se"])
-def test_residual_wrapper_is_exactly_the_identity_at_init(kind):
-    """Inserting attention into a pretrained backbone must not disturb it
-    before training: a raw sigmoid gate outputs ~0.5 and halves every
-    activation, discarding the ImageNet features the encoder was chosen for."""
+def test_residual_wrapper_starts_near_the_identity(kind):
+    """A 0.1 gate preserves most pretrained features and learns immediately."""
     blk = build_attention(kind, 32, residual=True)
     x = _x()
-    assert torch.allclose(blk(x), x, atol=1e-7)
+    assert torch.allclose(blk.gamma, torch.tensor([0.1]))
+    assert (blk(x) - x).abs().mean() < 0.2 * x.abs().mean()
 
 
 @pytest.mark.parametrize("kind", ["cbam", "se"])
@@ -116,10 +115,8 @@ def test_cbam_exposes_spatial_maps_and_se_does_not():
     assert se.spatial_maps() == []
 
 
-def test_residual_variant_starts_identical_to_the_baseline():
-    """With the zero-init gate, an untrained CBAM model must predict exactly
-    what the untrained baseline predicts -- the ablation starts from a common
-    point and diverges only through training."""
+def test_residual_variant_has_the_same_initial_pose_prior_as_baseline():
+    """Both zero heads start from the same metric motion prior."""
     torch.manual_seed(0)
     base = build("m4", pretrained=False, attention="none")
     torch.manual_seed(0)

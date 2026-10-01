@@ -7,8 +7,9 @@ model:
   hidden_size: 512
   num_layers: 2
   dropout: 0.2
-  whiten: true           # whitened pose targets; see mvo/common/data/pose_stats.py
-  rot_weight: 1.0        # whitening makes the axes commensurate
+  standardize: true      # output parameterisation; covariance is not whitened
+  rot_weight: 1.0        # group-normalised geodesic rotation term
+  bias_weight: 0.1       # penalise signed per-step residual that causes drift
 batch_size: 8
 lr: 1.0e-4
 epochs: 60

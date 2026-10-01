@@ -9,7 +9,6 @@ import pytest
 import torch
 import torch.nn as nn
 
-from mvo.common.geometry import se3
 from mvo.common.train.registry import build, import_all_models
 from mvo.models.m4_cnn_attention.model import AttentionVO, _inflate_conv1
 
@@ -141,9 +140,9 @@ def test_initial_prediction_is_exactly_the_identity():
     metric (mean |t| = 0.61 m), so scaling the head down damps translation
     gradients without buying anything.
     """
-    # whiten=False, since the whitened head deliberately starts at the mean
+    # standardize=False, since the standardised head starts at the mean
     # pose instead; that behaviour has its own test below.
-    out = _model(whiten=False)(_batch(b=4))
+    out = _model(standardize=False)(_batch(b=4))
     assert torch.equal(out["pose"], torch.zeros_like(out["pose"]))
 
 
@@ -161,32 +160,20 @@ def test_head_is_zero_initialised_but_trainable():
     assert m.decoder.head.weight.grad.abs().sum() > 0
 
 
-def test_rotation_weight_balances_the_two_loss_terms():
-    """The unwhitened path still needs DeepVO's k, and it must be measured.
+def test_loss_normalises_translation_and_rotation_by_group_spread():
+    """One group-RMS error should cost one in either physical component."""
+    from mvo.common.train.pose_loss import geometric_pose_loss
 
-    E[t^2]/E[r^2] is ~5869 on the training split, so the published k=100 leaves
-    rotation ~59x under-weighted. Whitening supersedes this (each axis gets an
-    equal share regardless), but the unwhitened path remains available for the
-    ablation and must stay correct.
-    """
-    m = _model(whiten=False, rot_weight=5900.0)
-    assert m.rot_weight > 1000, "k=100 leaves rotation effectively ignored"
-
-    # The balance is defined at initialisation, where the model predicts zero
-    # and each term reduces to the variance of its target. k is chosen so that
-    #     E[t^2]  ~=  k * E[r^2]
-    b = _realistic_batch(b=256, seed=1)
-    zero_pred = {"pose": torch.zeros(256, 1, 6)}
-    losses = m.compute_loss(b, zero_pred)
-
-    # Band is deliberately loose: T_STD/R_STD are a Gaussian approximation of
-    # the real per-axis spread, so the synthetic ratio (~2374:1) differs from
-    # the measured one (~5869:1). k=5900 lands at ~2.5 here; the old k=100
-    # lands at 0.04 and is still caught.
-    ratio = float(m.rot_weight * losses["rot"] / losses["trans"])
-    assert 0.2 < ratio < 5.0, (
-        f"weighted rotation term is {ratio:.2f}x the translation term; "
-        "k no longer matches the measured target statistics")
+    m = _model()
+    target = torch.zeros(1, 1, 6)
+    trans_pred = target.clone()
+    trans_pred[..., 2] = m.pose_std[:3].square().sum().sqrt()
+    rot_pred = target.clone()
+    rot_pred[..., 4] = m.pose_std[3:].square().sum().sqrt()
+    t = geometric_pose_loss(trans_pred, target, m.pose_std, bias_weight=0.0)
+    r = geometric_pose_loss(rot_pred, target, m.pose_std, bias_weight=0.0)
+    assert torch.allclose(t["trans"], torch.tensor(1.0), atol=1e-5)
+    assert torch.allclose(r["rot"], torch.tensor(1.0), atol=1e-4)
 
 
 # ------------------------------------------------------------------ backward
@@ -269,60 +256,40 @@ def test_loss_is_finite_and_weights_rotation():
     batch = _batch()
     losses = m.compute_loss(batch, m(batch))
 
-    assert {"total", "trans", "rot"} <= set(losses)
+    assert {"total", "trans", "rot", "bias"} <= set(losses)
     assert torch.isfinite(losses["total"])
     assert torch.allclose(losses["total"],
-                          losses["trans"] + m.rot_weight * losses["rot"])
+                          losses["trans"] + m.rot_weight * losses["rot"]
+                          + m.bias_weight * losses["bias"])
 
 
-# ------------------------------------------------------------- pose whitening
+# ------------------------------------------------------- pose standardisation
 
 
-def test_whitened_model_starts_at_the_mean_pose_not_the_identity():
+def test_standardised_model_starts_at_the_mean_pose_not_the_identity():
     """The point of adding the mean back.
 
-    With a zero-initialised head, an unwhitened model predicts the identity --
-    a stationary camera, which scores t_rel 99.16% on Scene20. The whitened
+    With a zero-initialised head, a metric-output model predicts the identity --
+    a stationary camera. The standardised
     model instead starts at the average training motion, which is where the
     trivial constant predictor ends, so training begins from a far better
     prior.
     """
     from mvo.common.data.pose_stats import POSE_MEAN
 
-    out = _model(whiten=True)(_batch(b=2))
+    out = _model(standardize=True)(_batch(b=2))
     expected = torch.tensor(POSE_MEAN)
     assert torch.allclose(out["pose"][0, 0], expected, atol=1e-6)
 
-    plain = _model(whiten=False)(_batch(b=2))
+    plain = _model(standardize=False)(_batch(b=2))
     assert torch.equal(plain["pose"], torch.zeros_like(plain["pose"]))
 
 
-def test_whitening_equalises_the_per_axis_gradient_share():
-    """Why whitening exists: unwhitened, tz takes 99.89% of the gradient."""
-    from mvo.common.data.pose_stats import POSE_STD
-
-    std = torch.tensor(POSE_STD)
-    plain_share = (std ** 2) / (std ** 2).sum()
-    assert plain_share[2] > 0.99, "tz should dominate an unwhitened MSE"
-
-    whitened = torch.ones(6) / 6.0          # unit variance on every axis
-    assert abs(float(whitened.max() - whitened.min())) < 1e-6
-
-
-def test_whitened_loss_is_scale_free_across_axes():
-    """An error of one standard deviation must cost the same on every axis."""
-    m = _model(whiten=True)
-    b = _batch(b=1)
-    b["rel_pose"] = torch.eye(4).expand(1, 1, 4, 4).contiguous()
-
-    costs = []
-    for axis in range(6):
-        off = torch.zeros(1, 1, 6)
-        off[0, 0, axis] = m.pose_std[axis]          # one sigma on this axis
-        target = se3.mat_to_vec(b["rel_pose"])
-        costs.append(float(m.compute_loss(b, {"pose": target + off})["total"]))
-
-    assert max(costs) / min(costs) < 1.01, f"axis costs differ: {costs}"
+def test_standardisation_is_output_parameterisation_not_full_whitening():
+    """The loss remains physical within each group; axes are not equal-cost."""
+    m = _model(standardize=True)
+    assert m.standardize
+    assert m.pose_std[2] > 40 * m.pose_std[0]
 
 
 def test_pose_prior_keeps_only_forward_translation():
@@ -348,6 +315,6 @@ def test_untrained_model_predicts_pure_forward_motion():
     typical speed' -- a prior that holds on any route."""
     from mvo.common.data.pose_stats import POSE_MEAN
 
-    pose = _model(whiten=True)(_batch(b=2))["pose"][0, 0]
+    pose = _model(standardize=True)(_batch(b=2))["pose"][0, 0]
     assert torch.allclose(pose, torch.tensor(POSE_MEAN), atol=1e-6)
     assert pose[4].abs() < 1e-9, "no yaw at initialisation"

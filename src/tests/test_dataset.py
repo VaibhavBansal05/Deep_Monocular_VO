@@ -34,14 +34,15 @@ def _train_ds(**kw):
         pytest.skip("dataset not present")
 
 
-def test_augmentation_is_not_frozen_per_sample():
-    """Regression: rng seeded from idx made each sample's jitter and flip
-    identical in every epoch, so augmentation regularised nothing."""
+def test_augmentation_is_reproducible_but_changes_by_epoch():
+    """Same seed/epoch/index must replay exactly; a new epoch must not freeze it."""
     import torch
-    ds = _train_ds(augment=True)
-    reads = [ds[7]["imgs"] for _ in range(6)]
-    assert any(not torch.equal(reads[0], r) for r in reads[1:]), \
-        "augmentation produced identical output six times; rng is seeded per sample"
+    a = _train_ds(augment=True, seed=123)
+    b = _train_ds(augment=True, seed=123)
+    assert torch.equal(a[7]["imgs"], b[7]["imgs"])
+    first = a[7]["imgs"]
+    a.set_epoch(1)
+    assert not torch.equal(first, a[7]["imgs"]), "augmentation is frozen across epochs"
 
 
 def test_augmented_samples_keep_a_stable_schema():

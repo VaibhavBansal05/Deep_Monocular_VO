@@ -32,6 +32,19 @@ OWNERS = {"m1": "Pranav Joshi", "m2": "Abhishek Laxman Jadhav",
           "m3": "Suryansh Bajaj", "m4": "Vaibhav Krishna Bansal"}
 
 
+def signed_pose_bias(pred_rel: torch.Tensor, gt_rel: torch.Tensor) -> dict[str, float]:
+    """Mean signed metric translation and geodesic rotation residuals."""
+    n = min(len(pred_rel), len(gt_rel))
+    pred_rel, gt_rel = pred_rel[:n], gt_rel[:n]
+    trans = (pred_rel[:, :3, 3] - gt_rel[:, :3, 3]).mean(dim=0)
+    rotation_error = (gt_rel[:, :3, :3].transpose(-1, -2)
+                      @ pred_rel[:, :3, :3])
+    rot = se3.so3_log(rotation_error).mean(dim=0)
+    names = ("tx_m", "ty_m", "tz_m", "rx_rad", "ry_rad", "rz_rad")
+    values = torch.cat([trans, rot]).cpu().tolist()
+    return {f"bias_{name}": float(value) for name, value in zip(names, values)}
+
+
 def git_sha() -> str:
     try:
         return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"],
@@ -90,6 +103,8 @@ def main() -> None:
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--split", default="test")
     ap.add_argument("--data-root", default="data/vkitti2")
+    ap.add_argument("--out", default=None,
+                    help="result directory; useful for M4 none/SE/CBAM ablations")
     args = ap.parse_args()
 
     import_all_models()
@@ -101,7 +116,7 @@ def main() -> None:
     model.load_state_dict(ck["model"])
     model.to(device)
 
-    out_dir = Path(f"results/{args.model}")
+    out_dir = Path(args.out or f"results/{args.model}")
     out_dir.mkdir(parents=True, exist_ok=True)
     per_seq = {}
 
@@ -123,12 +138,15 @@ def main() -> None:
 
         n = min(len(pred_abs), len(gt_abs))
         pred_abs, gt_abs = pred_abs[:n], gt_abs[:n]
+        pred_rel = torch.from_numpy(rel[:n - 1])
+        gt_rel = se3.absolute_to_relative(torch.from_numpy(gt_abs))
 
         m = {
             "ate_sim3": ate(pred_abs[:, :3, 3], gt_abs[:, :3, 3], with_scale=True)["rmse"],
             "ate_se3": ate(pred_abs[:, :3, 3], gt_abs[:, :3, 3], with_scale=False)["rmse"],
             **{f"rpe_{k}": v for k, v in rpe(pred_abs, gt_abs, delta=1).items()},
             **kitti_drift(pred_abs, gt_abs),
+            **signed_pose_bias(pred_rel, gt_rel),
             "ms_per_frame": ms,
         }
         per_seq[sid] = m
@@ -140,6 +158,7 @@ def main() -> None:
 
     payload = {"model": args.model, "owner": OWNERS.get(args.model, "?"),
                "split": args.split, "seed": cfg.get("seed", 42),
+               "model_config": cfg.get("model", {}),
                "params_m": model.num_params(), "commit": git_sha(),
                **agg, "per_sequence": per_seq}
     (out_dir / "metrics.json").write_text(json.dumps(payload, indent=2))

@@ -1,10 +1,9 @@
-"""Per-axis statistics of the ground-truth relative pose, and the whitening
-transform built from them.
+"""Per-axis statistics and standardisation for relative-pose outputs.
 
 Measured over the training split by scripts/measure_pose_stats.py. The spread
 between axes is 424x:
 
-    axis    mean        std        share of a plain-MSE gradient
+    axis    mean        std        share of plain-MSE target energy
     tx      +0.001471   0.010589    0.05 %
     ty      +0.006244   0.006491    0.02 %
     tz      -0.606309   0.471248   99.89 %
@@ -12,14 +11,15 @@ between axes is 424x:
     ry      +0.002316   0.009766    0.04 %
     rz      +0.000039   0.001112    0.00 %
 
-An unweighted MSE over the 6-vector therefore trains forward translation and
-almost nothing else, which is precisely the behaviour observed: both the
-recurrent and the attention model scored close to a baseline that simply
-applies the average relative pose at every frame.
+An unweighted MSE over the 6-vector is therefore dominated by forward
+translation.  The percentages above describe squared target energy, not a
+literal fixed share of every optimisation gradient.
 
-Two consequences follow, and models use both:
+Two consequences follow:
 
-1. Predicting a WHITENED pose gives every axis an equal share of the gradient.
+1. Predicting a STANDARDISED pose improves output-layer conditioning.  This is
+   not full whitening: axes are scaled independently and covariance is not
+   decorrelated.
 2. Adding a mean back means a zero-initialised head starts by predicting
    typical motion rather than the identity, which is a far better starting
    point than a stationary camera. Only the forward-translation mean is used;
@@ -67,11 +67,19 @@ def pose_mean_std(dtype=torch.float32) -> tuple[torch.Tensor, torch.Tensor]:
             torch.tensor(POSE_STD, dtype=dtype))
 
 
-def denormalize(norm: torch.Tensor, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
-    """whitened -> metric pose."""
-    return norm * std + mean
+def destandardize_pose(value: torch.Tensor, mean: torch.Tensor,
+                       std: torch.Tensor) -> torch.Tensor:
+    """Per-axis standardised pose -> metric pose."""
+    return value * std + mean
 
 
-def normalize(pose: torch.Tensor, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
-    """metric pose -> whitened."""
+def standardize_pose(pose: torch.Tensor, mean: torch.Tensor,
+                     std: torch.Tensor) -> torch.Tensor:
+    """Metric pose -> per-axis standardised pose."""
     return (pose - mean) / std
+
+
+# Backwards-compatible aliases for old notebooks/checkpoints.  New code uses
+# the precise terminology above.
+denormalize = destandardize_pose
+normalize = standardize_pose
