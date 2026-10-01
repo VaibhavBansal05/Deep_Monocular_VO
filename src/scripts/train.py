@@ -51,7 +51,8 @@ def make_val_trajectory_hook(cfg, model, data_root):
     scene, variation = splits.sequences("val")[0]
     sid = splits.seq_id(scene, variation)
     ds = VKitti2(root=data_root, split="val", seq_len=model.seq_len,
-                 need_depth=model.needs_depth, augment=False)
+                 need_depth=model.needs_depth, augment=False,
+                 seed=cfg.get("seed", 42))
     gt = ds.absolute_poses(sid)
     loader = DataLoader(ds, batch_size=cfg.get("batch_size", 8), shuffle=False,
                         num_workers=cfg.get("num_workers", 2))
@@ -99,15 +100,17 @@ def main() -> None:
              args.model, model.num_params(), model.seq_len, model.needs_depth)
 
     common = dict(root=cfg["data_root"], seq_len=model.seq_len,
-                  need_depth=model.needs_depth)
+                  need_depth=model.needs_depth, seed=cfg.get("seed", 42))
     train_ds = VKitti2(split="train", augment=cfg.get("augment", True), **common)
     val_ds = VKitti2(split="val", augment=False, **common)
 
     loader_kw = dict(batch_size=cfg.get("batch_size", 8),
                      num_workers=cfg.get("num_workers", 4),
-                     pin_memory=True, drop_last=True)
-    train_loader = DataLoader(train_ds, shuffle=True, **loader_kw)
-    val_loader = DataLoader(val_ds, shuffle=False, **loader_kw)
+                     pin_memory=True)
+    # Training may drop an undersized final batch because BatchNorm statistics
+    # are unreliable for it. Validation must score every sample.
+    train_loader = DataLoader(train_ds, shuffle=True, drop_last=True, **loader_kw)
+    val_loader = DataLoader(val_ds, shuffle=False, drop_last=False, **loader_kw)
 
     val_hook = None
     if cfg.get("selection_key", "total") != "total":

@@ -103,25 +103,26 @@ class ResidualAttention(nn.Module):
     degraded before training begins. With ~1k unique training frames there is
     not enough data to recover from that.
 
-    So the block is applied residually behind a scalar gate initialised to
-    zero:
+    So the block is applied residually behind a scalar gate initialised to a
+    small non-zero value:
 
-        y = x + gamma * (attn(x) - x),   gamma = 0 at init
+        y = x + gamma * (attn(x) - x),   gamma = 0.1 at init
 
-    At initialisation y = x exactly, and gamma is learned, so the network opts
-    into attention only to the extent it helps. Same mechanism as LayerScale in
-    vision transformers and ControlNet's zero convolutions.
+    The backbone therefore retains 90% of its original feature path while the
+    attention parameters receive gradients as soon as the pose head unfreezes
+    the encoder.  A zero gate delayed those parameters by an additional step.
 
     Set residual=False for the paper-faithful formulation; the ablation can
     report both.
     """
 
-    def __init__(self, block: nn.Module, residual: bool = True):
+    def __init__(self, block: nn.Module, residual: bool = True,
+                 gate_init: float = 0.1):
         super().__init__()
         self.block = block
         self.residual = residual
         if residual:
-            self.gamma = nn.Parameter(torch.zeros(1))
+            self.gamma = nn.Parameter(torch.full((1,), float(gate_init)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.block(x)
@@ -131,7 +132,8 @@ class ResidualAttention(nn.Module):
 
 
 def build_attention(kind: str, channels: int, reduction: int = 16,
-                    kernel_size: int = 7, residual: bool = True) -> nn.Module:
+                    kernel_size: int = 7, residual: bool = True,
+                    gate_init: float = 0.1) -> nn.Module:
     if kind == "none":
         return nn.Identity()
     if kind == "cbam":
@@ -140,4 +142,4 @@ def build_attention(kind: str, channels: int, reduction: int = 16,
         block = SEBlock(channels, reduction)
     else:
         raise ValueError(f"unknown attention {kind!r}; expected none|cbam|se")
-    return ResidualAttention(block, residual=residual)
+    return ResidualAttention(block, residual=residual, gate_init=gate_init)

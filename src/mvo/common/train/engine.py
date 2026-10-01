@@ -6,6 +6,7 @@ divergent training loops make the comparison table meaningless.
 """
 
 import json
+import os
 import random
 import time
 from pathlib import Path
@@ -21,12 +22,18 @@ log = get_logger(__name__)
 
 def set_seed(seed: int = 42) -> None:
     """Seed every RNG. Same seed across all four models -> fair comparison."""
+    # Required by deterministic CUDA matrix multiplication on supported GPUs;
+    # it must be set before the first CUDA GEMM is launched.
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    # warn_only preserves portability if a future model uses an operation with
+    # no deterministic CUDA implementation, while making that limitation loud.
+    torch.use_deterministic_algorithms(True, warn_only=True)
 
 
 def to_device(batch: dict, device: torch.device) -> dict:
@@ -133,6 +140,11 @@ class Trainer:
                  self.device, self.model.num_params(), self.epochs)
 
         for epoch in range(self.start_epoch, self.epochs):
+            # Augmentation is a deterministic function of (seed, epoch, idx).
+            # Set this before workers are spawned for the epoch.
+            set_epoch = getattr(self.train_loader.dataset, "set_epoch", None)
+            if set_epoch is not None:
+                set_epoch(epoch)
             tr = self._run_epoch(self.train_loader, train=True)
             va = self._run_epoch(self.val_loader, train=False)
             if self.val_hook is not None:

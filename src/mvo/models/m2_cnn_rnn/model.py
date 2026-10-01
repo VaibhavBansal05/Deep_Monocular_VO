@@ -13,10 +13,9 @@ Architecture:
     3. Linear pose head: 6-DoF per step [tx, ty, tz, rx, ry, rz].
        Initialised near zero so the pose starts near identity.
 
-Loss (DeepVO-style):
-    L = ||t̂ - t||² + rot_weight * ||r̂ - r||²
-    rot_weight ≈ 100  (radians are tiny between adjacent frames; without
-    upweighting the network predicts straight-line trajectories).
+Loss:
+    metric Euclidean translation + SO(3) geodesic rotation, with each group
+    normalised by its training-set RMS and a small signed-bias penalty.
 
 Viva notes:
     - The LSTM state carries accumulated scene context / motion history, NOT a map.
@@ -32,29 +31,16 @@ Viva notes:
 
 import torch
 import torch.nn as nn
-import torchvision.models as tvm
 
-from mvo.common.data.pose_stats import denormalize, normalize, pose_mean_std
+from mvo.common.data.pose_stats import destandardize_pose, pose_mean_std
 from mvo.common.geometry.se3 import mat_to_vec
 from mvo.common.train.base_model import BaseVOModel
+from mvo.common.train.pair_encoder import PairEncoder, PoseHead, inflate_conv1
+from mvo.common.train.pose_loss import geometric_pose_loss
 from mvo.common.train.registry import register
 
-
-def _inflate_conv1(pretrained_conv: nn.Conv2d) -> nn.Conv2d:
-    """Duplicate 3-channel pretrained weights to 6-channel input, halving to
-    preserve the expected activation scale (E[|Wx|] ≈ constant if input stats
-    are similar for both channels of a stereo pair)."""
-    w3 = pretrained_conv.weight.data          # (64, 3, 7, 7)
-    w6 = torch.cat([w3, w3], dim=1) * 0.5    # (64, 6, 7, 7)
-    conv6 = nn.Conv2d(6, pretrained_conv.out_channels,
-                      kernel_size=pretrained_conv.kernel_size,
-                      stride=pretrained_conv.stride,
-                      padding=pretrained_conv.padding,
-                      bias=pretrained_conv.bias is not None)
-    conv6.weight = nn.Parameter(w6)
-    if pretrained_conv.bias is not None:
-        conv6.bias = nn.Parameter(pretrained_conv.bias.data.clone())
-    return conv6
+# Kept for old imports/tests; both M2 and M4 now use the shared implementation.
+_inflate_conv1 = inflate_conv1
 
 
 @register("m2")
@@ -66,7 +52,8 @@ class M2CnnRnn(BaseVOModel):
         hidden_size: int (default 512)
         num_layers:  int (default 2)
         dropout:     float (default 0.2)
-        rot_weight:  float (default 100.0)
+        rot_weight:  relative weight of the geodesic rotation group
+        bias_weight: penalty on the signed mean residual in a mini-batch
     """
 
     seq_len: int = 5
@@ -74,39 +61,29 @@ class M2CnnRnn(BaseVOModel):
 
     def __init__(self, rnn: str = "lstm", hidden_size: int = 512,
                  num_layers: int = 2, dropout: float = 0.2,
-                 rot_weight: float = 1.0, pretrained: bool = True,
-                 whiten: bool = True, seq_len: int = 5, **kwargs):
+                 rot_weight: float = 1.0, bias_weight: float = 0.1,
+                 pretrained: bool = True, backbone: str = "resnet18",
+                 standardize: bool | None = None, whiten: bool | None = None,
+                 seq_len: int = 5, **kwargs):
         super().__init__()
         self.rnn_type = rnn.lower()
         if seq_len < 2:
             raise ValueError(f"seq_len must be >= 2, got {seq_len}")
         self.seq_len = int(seq_len)
-        self.rot_weight = rot_weight
-        self.whiten = bool(whiten)
+        self.rot_weight = float(rot_weight)
+        self.bias_weight = float(bias_weight)
+        # ``whiten`` is accepted only so old checkpoint configs still build.
+        self.standardize = bool(whiten if standardize is None and whiten is not None
+                                else True if standardize is None else standardize)
+        self.whiten = self.standardize
         _mean, _std = pose_mean_std()
         self.register_buffer("pose_mean", _mean)
         self.register_buffer("pose_std", _std)
 
-        # ---- Backbone -------------------------------------------------------
-        weights = tvm.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
-        resnet = tvm.resnet18(weights=weights)
-
-        # Inflate conv1: 3 channels → 6 channels (stacked frame pair)
-        resnet.conv1 = _inflate_conv1(resnet.conv1)
-
-        # Strip the classification head; keep layers up to layer4
-        self.backbone = nn.Sequential(
-            resnet.conv1,
-            resnet.bn1,
-            resnet.relu,
-            resnet.maxpool,
-            resnet.layer1,
-            resnet.layer2,
-            resnet.layer3,
-            resnet.layer4,
-            nn.AdaptiveAvgPool2d((1, 1)),   # → (B*(S-1), 512, 1, 1)
-        )
-        feat_dim = 512  # ResNet18 layer4 output channels
+        # Shared with M4.  Therefore M2(rnn=none) and M4(attention=none)
+        # differ only in their sequence wrapper, not in backbone or pose head.
+        self.encoder = PairEncoder(backbone, pretrained)
+        feat_dim = self.encoder.out_channels
 
         # ---- RNN head -------------------------------------------------------
         rnn_dropout = dropout if num_layers > 1 else 0.0
@@ -125,10 +102,7 @@ class M2CnnRnn(BaseVOModel):
             raise ValueError(f"rnn must be 'lstm', 'gru', or 'none'; got {rnn!r}")
 
         # ---- Pose head -------------------------------------------------------
-        self.pose_head = nn.Linear(out_dim, 6)
-        # Initialise near zero so early poses are near identity
-        nn.init.normal_(self.pose_head.weight, std=1e-4)
-        nn.init.zeros_(self.pose_head.bias)
+        self.pose_head = PoseHead(out_dim, dropout)
 
     # ---------------------------------------------------------------------- #
 
@@ -145,8 +119,7 @@ class M2CnnRnn(BaseVOModel):
         pairs_flat = pairs.flatten(0, 1)                        # (B*(S-1), 6, H, W)
 
         # CNN features
-        feats = self.backbone(pairs_flat)             # (B*(S-1), 512, 1, 1)
-        feats = feats.flatten(1)                      # (B*(S-1), 512)
+        feats = self.encoder(pairs_flat)              # (B*(S-1), 512)
         feats = feats.reshape(B, S - 1, -1)          # (B, S-1, 512)
 
         # RNN (temporal modelling)
@@ -155,31 +128,17 @@ class M2CnnRnn(BaseVOModel):
 
         # 6-DoF pose per step
         raw = self.pose_head(feats)                   # (B, S-1, 6)
-        # Head predicts a whitened pose; the contract requires a metric one.
-        pose = denormalize(raw, self.pose_mean, self.pose_std) if self.whiten else raw
+        # Standardisation conditions the output parameters; all public poses
+        # and the geometric loss remain in metric units.
+        pose = (destandardize_pose(raw, self.pose_mean, self.pose_std)
+                if self.standardize else raw)
         return {"pose": pose}
 
     def compute_loss(self, batch: dict, out: dict) -> dict:
-        """DeepVO-style weighted MSE.  L = ||t̂-t||² + k*||r̂-r||²
-
-        GT rel_pose is (B, S-1, 4, 4); convert to 6-vec via mat_to_vec.
-        With whiten=True the six axes are already commensurate and rot_weight
-        is 1. Without it, k must be measured rather than copied from the paper:
-        E[t^2]/E[r^2] is about 5869 on this data, not the 100 DeepVO used.
-        """
+        """Shared Euclidean-translation and geodesic-rotation objective."""
         pose_pred = out["pose"]                        # (B, S-1, 6)
         rel_mat = batch["rel_pose"].to(pose_pred.dtype)  # (B, S-1, 4, 4)
         pose_gt = mat_to_vec(rel_mat)                  # (B, S-1, 6)
 
-        if self.whiten:
-            # Per-axis variance spans 424x on this data: a plain MSE sends
-            # 99.89% of its gradient to tz and trains forward translation
-            # alone. Whitening equalises the six axes.
-            pose_pred = normalize(pose_pred, self.pose_mean, self.pose_std)
-            pose_gt = normalize(pose_gt, self.pose_mean, self.pose_std)
-
-        t_err = (pose_pred[..., :3] - pose_gt[..., :3]).pow(2).mean()
-        r_err = (pose_pred[..., 3:] - pose_gt[..., 3:]).pow(2).mean()
-        total = t_err + self.rot_weight * r_err
-
-        return {"total": total, "trans": t_err.detach(), "rot": r_err.detach()}
+        return geometric_pose_loss(pose_pred, pose_gt, self.pose_std,
+                                   self.rot_weight, self.bias_weight)
