@@ -24,6 +24,7 @@ Nobody else edits this folder. See handoff/ for the full spec.
 
 from .cache import CACHE_SCHEMA_VERSION, CachedFeature, FeatureCache
 from .frontend import ClassicalFrontend, FrontendResult
+from .network import PoseMLP
 
 __all__ = [
     "CACHE_SCHEMA_VERSION",
@@ -31,4 +32,5 @@ __all__ = [
     "ClassicalFrontend",
     "FeatureCache",
     "FrontendResult",
+    "PoseMLP",
 ]

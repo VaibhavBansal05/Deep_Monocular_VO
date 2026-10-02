@@ -7,6 +7,7 @@ import torch
 
 from mvo.models.m1_classical_mlp.cache import FeatureCache
 from mvo.models.m1_classical_mlp.frontend import ClassicalFrontend
+from mvo.models.m1_classical_mlp.network import PoseMLP
 from mvo.models.m1_classical_mlp.precompute import (
     images_to_uint8,
     pair_key,
@@ -268,3 +269,69 @@ def test_precompute_uses_shared_dataset_and_writes_loadable_cache(tmp_path, monk
         expected_frontend_config={**frontend.configuration(), "img_size": [128, 416]},
     )
     assert "Scene01/clone:00000:00001" in loaded
+
+
+def test_pose_mlp_has_planned_architecture_and_output_shape():
+    model = PoseMLP(input_dim=192, hidden_sizes=(512, 256, 128), dropout=0.2)
+    linear_layers = [module for module in model.modules() if isinstance(module, torch.nn.Linear)]
+    batch_norms = [module for module in model.modules() if isinstance(module, torch.nn.BatchNorm1d)]
+    dropouts = [module for module in model.modules() if isinstance(module, torch.nn.Dropout)]
+
+    assert [(layer.in_features, layer.out_features) for layer in linear_layers] == [
+        (192, 512),
+        (512, 256),
+        (256, 128),
+        (128, 6),
+    ]
+    assert [layer.num_features for layer in batch_norms] == [512, 256, 128]
+    assert [layer.p for layer in dropouts] == [0.2, 0.2, 0.2]
+    model.eval()
+    output = model(torch.randn(4, 192))
+    assert output.shape == (4, 6)
+
+
+def test_pose_mlp_zero_head_starts_at_standardised_motion_prior():
+    model = PoseMLP()
+    model.eval()
+
+    output = model(torch.randn(3, 192))
+
+    assert torch.equal(output, torch.zeros_like(output))
+    assert torch.equal(model.pose_head.weight, torch.zeros_like(model.pose_head.weight))
+    assert torch.equal(model.pose_head.bias, torch.zeros_like(model.pose_head.bias))
+
+
+def test_pose_mlp_backward_is_finite():
+    model = PoseMLP(dropout=0.0)
+    descriptor = torch.randn(8, 192)
+    target = torch.randn(8, 6)
+
+    loss = torch.nn.functional.mse_loss(model(descriptor), target)
+    loss.backward()
+
+    assert torch.isfinite(loss)
+    assert all(parameter.grad is not None for parameter in model.parameters())
+    assert all(torch.isfinite(parameter.grad).all() for parameter in model.parameters())
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"input_dim": 0},
+        {"hidden_sizes": ()},
+        {"hidden_sizes": (64, 0)},
+        {"dropout": -0.1},
+        {"dropout": 1.0},
+    ],
+)
+def test_pose_mlp_rejects_invalid_architecture(kwargs):
+    with pytest.raises(ValueError):
+        PoseMLP(**kwargs)
+
+
+def test_pose_mlp_rejects_wrong_descriptor_shape():
+    model = PoseMLP()
+    with pytest.raises(ValueError, match="descriptor shape"):
+        model(torch.randn(2, 191))
+    with pytest.raises(ValueError, match="descriptor shape"):
+        model(torch.randn(2, 1, 192))
