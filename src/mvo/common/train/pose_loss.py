@@ -30,6 +30,25 @@ def geometric_pose_loss(pred: torch.Tensor, target: torch.Tensor,
     if pred.shape != target.shape or pred.shape[-1] != 6:
         raise ValueError(f"expected matching (...,6) poses, got {pred.shape} and {target.shape}")
 
+    # SO(3) exp/log contain norms, trigonometric functions and products close
+    # to the identity.  Running these in float16 under CUDA autocast can create
+    # non-finite backward values even while the scalar loss remains finite.
+    # GradScaler then silently skips every optimiser step.  Keep the network
+    # forward in mixed precision, but force this small geometric calculation
+    # to FP32 (or preserve FP64 tests).
+    work_dtype = (torch.float32 if pred.dtype in (torch.float16, torch.bfloat16)
+                  else pred.dtype)
+    with torch.amp.autocast(pred.device.type, enabled=False):
+        return _geometric_pose_loss(
+            pred.to(work_dtype), target.to(work_dtype), pose_std.to(work_dtype),
+            rot_weight, bias_weight)
+
+
+def _geometric_pose_loss(pred: torch.Tensor, target: torch.Tensor,
+                         pose_std: torch.Tensor, rot_weight: float,
+                         bias_weight: float) -> dict[str, torch.Tensor]:
+    """Implementation executed with autocast disabled; see public wrapper."""
+
     eps = torch.finfo(pred.dtype).eps
     trans_scale_sq = pose_std[:3].square().sum().clamp_min(eps)
     rot_scale_sq = pose_std[3:].square().sum().clamp_min(eps)

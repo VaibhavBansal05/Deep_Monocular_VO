@@ -43,3 +43,16 @@ def test_bias_penalty_detects_coherent_but_not_cancelling_residuals():
     b = geometric_pose_loss(cancelling, target, std)
     assert a["bias"] > 0
     assert torch.allclose(b["bias"], torch.tensor(0.0))
+
+
+def test_geometric_loss_stays_fp32_inside_autocast():
+    """SO(3) math must not be downcast by the surrounding AMP context."""
+    pred = torch.zeros(2, 1, 6, requires_grad=True)
+    target = pred.detach().clone()
+    target[..., 2] = -0.6
+    target[..., 4] = 0.01
+    with torch.amp.autocast("cpu", dtype=torch.bfloat16):
+        loss = geometric_pose_loss(pred, target, torch.ones(6))
+    assert loss["total"].dtype == torch.float32
+    loss["total"].backward()
+    assert torch.isfinite(pred.grad).all()

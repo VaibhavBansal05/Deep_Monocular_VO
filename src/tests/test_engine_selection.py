@@ -6,6 +6,7 @@ that way. The engine therefore supports selecting on a trajectory-level metric
 supplied by a hook.
 """
 
+import pytest
 import torch
 from torch.utils.data import DataLoader, Dataset
 
@@ -96,3 +97,15 @@ def test_weight_decay_reaches_the_optimizer(tmp_path):
     t = _trainer(tmp_path, {"epochs": 1, "device": "cpu", "amp": False,
                             "weight_decay": 1e-4})
     assert t.optimizer.param_groups[0]["weight_decay"] == 1e-4
+
+
+def test_nonfinite_gradients_fail_instead_of_silently_skipping_steps(tmp_path):
+    class NonFiniteToy(_Toy):
+        def compute_loss(self, batch, out):
+            return {"total": out["pose"].sum() * torch.tensor(float("nan"))}
+
+    dl = DataLoader(_Tiny(), batch_size=2)
+    t = Trainer(NonFiniteToy(), dl, dl,
+                {"epochs": 1, "device": "cpu", "amp": False}, tmp_path)
+    with pytest.raises(RuntimeError, match="non-finite"):
+        t._run_epoch(dl, train=True)
