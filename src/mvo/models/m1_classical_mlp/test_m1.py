@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
+from mvo.models.m1_classical_mlp.cache import FeatureCache
 from mvo.models.m1_classical_mlp.frontend import ClassicalFrontend
 
 IMAGE_SHAPE = (128, 416)
@@ -141,3 +142,54 @@ def test_image_pair_extraction_is_deterministic(detector):
     assert np.array_equal(first.descriptor, second.descriptor)
     assert np.array_equal(first.rotation, second.rotation)
     assert np.array_equal(first.translation_direction, second.translation_direction)
+
+
+def test_feature_cache_round_trip_preserves_results(tmp_path):
+    points0, points1, _, _ = _synthetic_correspondences()
+    frontend = ClassicalFrontend()
+    success = frontend.estimate_from_correspondences(points0, points1, K, IMAGE_SHAPE)
+    failure = frontend.estimate_from_correspondences(
+        np.zeros((4, 2)), np.zeros((4, 2)), K, IMAGE_SHAPE
+    )
+    config = {"detector": "orb", "grid": (8, 8), "max_features": 1000}
+    cache = FeatureCache.from_results(
+        ["Scene01/clone:00000:00001", "Scene01/clone:00001:00002"],
+        [success, failure],
+        frontend_config=config,
+    )
+    path = tmp_path / "features.npz"
+
+    cache.save(path)
+    loaded = FeatureCache.load(path, expected_descriptor_dim=192, expected_frontend_config=config)
+
+    assert len(loaded) == 2
+    np.testing.assert_array_equal(
+        loaded["Scene01/clone:00000:00001"].descriptor, success.descriptor
+    )
+    failed = loaded["Scene01/clone:00001:00002"]
+    assert not failed.success
+    assert failed.failure_reason == "too_few_correspondences"
+    assert failed.correspondences == 4
+
+
+def test_feature_cache_rejects_duplicate_keys():
+    points0, points1, _, _ = _synthetic_correspondences()
+    result = ClassicalFrontend().estimate_from_correspondences(points0, points1, K, IMAGE_SHAPE)
+
+    with pytest.raises(ValueError, match="unique"):
+        FeatureCache.from_results(["same", "same"], [result, result])
+
+
+def test_feature_cache_rejects_stale_frontend_configuration(tmp_path):
+    points0, points1, _, _ = _synthetic_correspondences()
+    result = ClassicalFrontend().estimate_from_correspondences(points0, points1, K, IMAGE_SHAPE)
+    cache = FeatureCache.from_results(
+        ["Scene01/clone:00000:00001"],
+        [result],
+        frontend_config={"detector": "orb"},
+    )
+    path = tmp_path / "features.npz"
+    cache.save(path)
+
+    with pytest.raises(ValueError, match="configuration"):
+        FeatureCache.load(path, expected_frontend_config={"detector": "shitomasi"})
