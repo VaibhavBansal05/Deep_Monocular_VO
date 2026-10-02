@@ -1,0 +1,60 @@
+{
+  "model": "m1",
+  "owner": "Pranav Joshi",
+  "split": "test",
+  "seed": 42,
+  "model_config": {
+    "detector": "orb",
+    "max_features": 1000,
+    "grid": [
+      8,
+      8
+    ],
+    "cache_path": "data/m1_features/features.npz",
+    "img_size": [
+      128,
+      416
+    ],
+    "hidden": [
+      512,
+      256,
+      128
+    ],
+    "dropout": 0.2,
+    "standardize": true,
+    "rot_weight": 1.0,
+    "bias_weight": 0.1
+  },
+  "params_m": 0.265606,
+  "commit": "009426b",
+  "ate_sim3": 24.208655507752646,
+  "ate_se3": 68.32023270150769,
+  "rpe_trans_rmse": 0.3878430426120758,
+  "rpe_rot_rmse_deg": 0.2181823306978853,
+  "t_rel_pct": 36.61383819580078,
+  "r_rel_deg_per_100m": 8.400213606090599,
+  "bias_tx_m": -0.0021292532328516245,
+  "bias_ty_m": -0.005482866894453764,
+  "bias_tz_m": 0.26565730571746826,
+  "bias_rx_rad": -0.0002190512459492311,
+  "bias_ry_rad": -0.0006934977136552334,
+  "bias_rz_rad": 3.897208080161363e-05,
+  "ms_per_frame": 9.727009745876185,
+  "per_sequence": {
+    "Scene20/clone": {
+      "ate_sim3": 24.208655507752646,
+      "ate_se3": 68.32023270150769,
+      "rpe_trans_rmse": 0.3878430426120758,
+      "rpe_rot_rmse_deg": 0.2181823306978853,
+      "t_rel_pct": 36.61383819580078,
+      "r_rel_deg_per_100m": 8.400213606090599,
+      "bias_tx_m": -0.0021292532328516245,
+      "bias_ty_m": -0.005482866894453764,
+      "bias_tz_m": 0.26565730571746826,
+      "bias_rx_rad": -0.0002190512459492311,
+      "bias_ry_rad": -0.0006934977136552334,
+      "bias_rz_rad": 3.897208080161363e-05,
+      "ms_per_frame": 9.727009745876185
+    }
+  }
+}
