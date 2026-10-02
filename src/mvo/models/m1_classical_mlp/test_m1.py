@@ -7,6 +7,7 @@ import torch
 
 from mvo.models.m1_classical_mlp.cache import FeatureCache
 from mvo.models.m1_classical_mlp.frontend import ClassicalFrontend
+from mvo.models.m1_classical_mlp.model import ClassicalMLPVO
 from mvo.models.m1_classical_mlp.network import PoseMLP
 from mvo.models.m1_classical_mlp.precompute import (
     images_to_uint8,
@@ -335,3 +336,82 @@ def test_pose_mlp_rejects_wrong_descriptor_shape():
         model(torch.randn(2, 191))
     with pytest.raises(ValueError, match="descriptor shape"):
         model(torch.randn(2, 1, 192))
+
+
+def _write_model_cache(tmp_path):
+    config = ClassicalFrontend().configuration()
+    config["img_size"] = [128, 416]
+    cache = FeatureCache(
+        keys=np.asarray(["Scene01/clone:00000:00001", "Scene01/clone:00001:00002"]),
+        descriptors=np.stack(
+            [
+                np.linspace(-1.0, 1.0, 192, dtype=np.float32),
+                np.linspace(1.0, -1.0, 192, dtype=np.float32),
+            ]
+        ),
+        rotations=np.repeat(np.eye(3, dtype=np.float32)[None], 2, axis=0),
+        translation_directions=np.zeros((2, 3), dtype=np.float32),
+        success=np.asarray([True, False]),
+        failure_reasons=np.asarray(["", "too_few_inliers"]),
+        diagnostics=np.asarray([[100, 100, 80, 60], [20, 20, 10, 4]], dtype=np.int32),
+        frontend_config=config,
+    )
+    path = tmp_path / "model_features.npz"
+    cache.save(path)
+    return path
+
+
+def _model_batch():
+    return {
+        "seq_id": ["Scene01/clone", "Scene01/clone"],
+        "frame_idx": torch.tensor([[0, 1], [1, 2]]),
+        "rel_pose": torch.eye(4).repeat(2, 1, 1, 1),
+        "imgs": torch.zeros(2, 2, 3, *IMAGE_SHAPE),
+    }
+
+
+def test_registered_m1_model_returns_metric_pose_contract(tmp_path):
+    from mvo.common.data.pose_stats import POSE_MEAN
+    from mvo.common.train.registry import build
+
+    path = _write_model_cache(tmp_path)
+    model = build("m1", cache_path=path)
+    model.eval()
+
+    output = model(_model_batch())
+
+    assert isinstance(model, ClassicalMLPVO)
+    assert model.seq_len == 2 and model.needs_depth is False
+    assert output["pose"].shape == (2, 1, 6)
+    expected = torch.tensor(POSE_MEAN).view(1, 1, 6).expand(2, -1, -1)
+    torch.testing.assert_close(output["pose"], expected)
+    assert output["frontend_success"].tolist() == [[True], [False]]
+
+
+def test_m1_model_uses_shared_geometric_loss_with_finite_backward(tmp_path):
+    model = ClassicalMLPVO(cache_path=_write_model_cache(tmp_path), dropout=0.0)
+    batch = _model_batch()
+    output = model(batch)
+
+    losses = model.compute_loss(batch, output)
+    losses["total"].backward()
+
+    assert set(losses) == {"total", "trans", "rot", "bias"}
+    assert all(torch.isfinite(value) for value in losses.values())
+    assert model.regressor.pose_head.weight.grad is not None
+    assert torch.isfinite(model.regressor.pose_head.weight.grad).all()
+
+
+def test_m1_model_reports_missing_cache_pair(tmp_path):
+    model = ClassicalMLPVO(cache_path=_write_model_cache(tmp_path))
+    batch = _model_batch()
+    batch["frame_idx"][1] = torch.tensor([8, 9])
+
+    with pytest.raises(KeyError, match="00008:00009"):
+        model(batch)
+
+
+def test_m1_model_rejects_cache_configuration_mismatch(tmp_path):
+    path = _write_model_cache(tmp_path)
+    with pytest.raises(ValueError, match="detector"):
+        ClassicalMLPVO(cache_path=path, detector="shitomasi")
