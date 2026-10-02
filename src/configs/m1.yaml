@@ -3,9 +3,14 @@ model:
   detector: orb          # orb | shitomasi
   max_features: 1000
   grid: [8, 8]           # flow field binned into an 8x8 grid
+  cache_path: data/m1_features/features.npz
+  img_size: [128, 416]
   hidden: [512, 256, 128]
   dropout: 0.2
+  standardize: true
+  rot_weight: 1.0
+  bias_weight: 0.1
 batch_size: 64           # features are precomputed -> big batches are free
 lr: 1.0e-3
 epochs: 100
-augment: false           # augmentation happens before feature extraction
+augment: false           # cached descriptors must match the unaugmented images

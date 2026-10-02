@@ -24,11 +24,15 @@ Nobody else edits this folder. See handoff/ for the full spec.
 
 from .cache import CACHE_SCHEMA_VERSION, CachedFeature, FeatureCache
 from .frontend import ClassicalFrontend, FrontendResult
+from .model import ClassicalMLPVO
+from .network import PoseMLP
 
 __all__ = [
     "CACHE_SCHEMA_VERSION",
     "CachedFeature",
     "ClassicalFrontend",
+    "ClassicalMLPVO",
     "FeatureCache",
     "FrontendResult",
+    "PoseMLP",
 ]
