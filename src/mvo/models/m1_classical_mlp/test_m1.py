@@ -3,9 +3,15 @@
 import cv2
 import numpy as np
 import pytest
+import torch
 
 from mvo.models.m1_classical_mlp.cache import FeatureCache
 from mvo.models.m1_classical_mlp.frontend import ClassicalFrontend
+from mvo.models.m1_classical_mlp.precompute import (
+    images_to_uint8,
+    pair_key,
+    precompute_feature_cache,
+)
 
 IMAGE_SHAPE = (128, 416)
 K = np.array([[400.0, 0.0, 208.0], [0.0, 400.0, 64.0], [0.0, 0.0, 1.0]])
@@ -193,3 +199,72 @@ def test_feature_cache_rejects_stale_frontend_configuration(tmp_path):
 
     with pytest.raises(ValueError, match="configuration"):
         FeatureCache.load(path, expected_frontend_config={"detector": "shitomasi"})
+
+
+def test_pair_key_requires_adjacent_frame_pair():
+    assert pair_key("Scene01/clone", torch.tensor([7, 8])) == "Scene01/clone:00007:00008"
+    with pytest.raises(ValueError, match="adjacent"):
+        pair_key("Scene01/clone", [7, 9])
+    with pytest.raises(ValueError, match="exactly two"):
+        pair_key("Scene01/clone", [7])
+
+
+def test_images_to_uint8_inverts_shared_normalisation():
+    from mvo.common.data.transforms import normalize
+
+    raw = torch.tensor(
+        [
+            [[[0.0]], [[0.5]], [[1.0]]],
+            [[[0.25]], [[0.75]], [[0.1]]],
+        ]
+    )
+    converted = images_to_uint8(normalize(raw))
+
+    assert converted.shape == (2, 1, 1, 3)
+    np.testing.assert_array_equal(converted[0, 0, 0], np.array([0, 128, 255]))
+    np.testing.assert_array_equal(converted[1, 0, 0], np.array([64, 191, 26]))
+
+
+def test_precompute_uses_shared_dataset_and_writes_loadable_cache(tmp_path, monkeypatch):
+    from mvo.models.m1_classical_mlp import precompute
+
+    rng = np.random.default_rng(23)
+    raw = torch.from_numpy(rng.random((3, 3, *IMAGE_SHAPE), dtype=np.float32))
+    from mvo.common.data.transforms import normalize
+
+    class FakeVKitti2:
+        def __init__(self, **kwargs):
+            assert kwargs["seq_len"] == 2
+            assert kwargs["augment"] is False
+
+        def __len__(self):
+            return 2
+
+        def __getitem__(self, index):
+            return {
+                "imgs": normalize(raw[index : index + 2]),
+                "K": torch.from_numpy(K.copy()),
+                "seq_id": "Scene01/clone",
+                "frame_idx": torch.tensor([index, index + 1]),
+            }
+
+    monkeypatch.setattr(precompute, "VKitti2", FakeVKitti2)
+    path = tmp_path / "features.npz"
+    frontend = ClassicalFrontend(max_features=200)
+    cache, summary = precompute_feature_cache(
+        tmp_path,
+        path,
+        split_names=("train",),
+        frontend=frontend,
+        show_progress=False,
+    )
+
+    assert path.is_file()
+    assert len(cache) == 2
+    assert summary["train"]["pairs"] == 2
+    loaded = FeatureCache.load(
+        path,
+        expected_descriptor_dim=192,
+        expected_frontend_config={**frontend.configuration(), "img_size": [128, 416]},
+    )
+    assert "Scene01/clone:00000:00001" in loaded

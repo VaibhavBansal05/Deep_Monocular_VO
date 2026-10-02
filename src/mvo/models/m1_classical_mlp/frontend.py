@@ -105,6 +105,25 @@ class ClassicalFrontend:
         """Number of MLP inputs: mean dx, mean dy, and inlier density per cell."""
         return self.grid[0] * self.grid[1] * 3
 
+    def configuration(self) -> dict:
+        """JSON-compatible settings that determine cached front-end outputs."""
+        return {
+            "detector": self.detector,
+            "max_features": self.max_features,
+            "grid": list(self.grid),
+            "ratio_test": self.ratio_test,
+            "min_correspondences": self.min_correspondences,
+            "min_inliers": self.min_inliers,
+            "ransac_threshold": self.ransac_threshold,
+            "ransac_confidence": self.ransac_confidence,
+            "shi_quality": self.shi_quality,
+            "shi_min_distance": self.shi_min_distance,
+            "lk_window": self.lk_window,
+            "lk_levels": self.lk_levels,
+            "lk_fb_threshold": self.lk_fb_threshold,
+            "seed": self.seed,
+        }
+
     def extract(self, image0: np.ndarray, image1: np.ndarray, K: np.ndarray) -> FrontendResult:
         """Extract correspondences and estimate motion from an RGB or grayscale pair."""
         gray0 = self._to_gray(image0)
