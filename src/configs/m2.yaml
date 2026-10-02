@@ -13,3 +13,6 @@ model:
 batch_size: 8
 lr: 1.0e-4
 epochs: 60
+# cuDNN LSTM backward produced non-finite FP16 gradients on Kaggle T4 and
+# GradScaler skipped every update. Keep M2 in full FP32; M4 may still use AMP.
+amp: false
