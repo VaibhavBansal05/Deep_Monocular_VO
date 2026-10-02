@@ -120,9 +120,14 @@ class Trainer:
             if train:
                 self.optimizer.zero_grad(set_to_none=True)
                 self.scaler.scale(losses["total"]).backward()
-                if self.clip > 0:
-                    self.scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip)
+                self.scaler.unscale_(self.optimizer)
+                # Never let AMP silently skip an entire run. The previous M2
+                # run produced finite losses but non-finite gradients, so
+                # GradScaler skipped all updates and the model stayed exactly
+                # at its initial mean-pose prior for 60 epochs.
+                max_norm = self.clip if self.clip > 0 else float("inf")
+                torch.nn.utils.clip_grad_norm_(
+                    self.model.parameters(), max_norm, error_if_nonfinite=True)
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
 
