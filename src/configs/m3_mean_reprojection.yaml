@@ -1,0 +1,25 @@
+# Matched 20-epoch ablation; compare with m3_ablation_base.
+model:
+  seq_len: 3
+  backbone: resnet18
+  pretrained: true
+  num_scales: 4
+  min_depth: 0.1
+  max_depth: 100.0
+  ssim_weight: 0.85
+  smooth_weight: 0.001
+  automask: true
+  min_reproj: false
+batch_size: 8
+lr: 0.0001
+epochs: 20
+scheduler: step
+lr_step: 15
+lr_gamma: 0.1
+optimizer: adam
+weight_decay: 0.0001
+grad_clip: 1.0
+amp: false
+augment: false
+num_workers: 2
+selection_key: val_ate
