@@ -8,7 +8,9 @@ divergent training loops make the comparison table meaningless.
 import json
 import os
 import random
+import subprocess
 import time
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +20,36 @@ from torch.utils.data import DataLoader
 from mvo.common.io.logging import CSVLogger, get_logger
 
 log = get_logger(__name__)
+
+
+def training_revision():
+    """Identify this checkout even when training is launched from another directory."""
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True,
+                                       cwd=Path(__file__).resolve().parent,
+                                       stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def rng_state():
+    """Capture global RNGs used by the shared non-persistent data loaders."""
+    return {"python": random.getstate(), "numpy": np.random.get_state(),
+            "torch": torch.get_rng_state(),
+            "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else []}
+
+
+def restore_rng(state):
+    random.setstate(state["python"])
+    np.random.set_state(state["numpy"])
+    torch.set_rng_state(state["torch"].cpu())
+    if state["cuda"]:
+        if not torch.cuda.is_available():
+            warnings.warn("CUDA is unavailable; exact resume is unavailable", RuntimeWarning)
+        elif len(state["cuda"]) != torch.cuda.device_count():
+            warnings.warn("CUDA device count changed; exact resume is unavailable", RuntimeWarning)
+        else:
+            torch.cuda.set_rng_state_all([s.cpu() for s in state["cuda"]])
 
 
 def set_seed(seed: int = 42) -> None:
@@ -74,6 +106,7 @@ class Trainer:
         self.csv = CSVLogger(self.out_dir / "history.csv")
         self.best_val = float("inf")
         self.start_epoch = 0
+        self.training_commit = training_revision()
 
     def _build_optimizer(self):
         name = self.cfg.get("optimizer", "adam").lower()
@@ -168,12 +201,12 @@ class Trainer:
             log.info("epoch %3d | train %.5f | val %.5f%s | %.1fs",
                      epoch, tr["total"], va["total"], extra, tr["sec"])
 
-            self.save("last.pt", epoch)
             score = va.get(self.selection_key, va["total"])
             if score < self.best_val:
                 self.best_val = score
                 self.save("best.pt", epoch)
                 log.info("  new best %s %.5f", self.selection_key, self.best_val)
+            self.save("last.pt", epoch)
 
         (self.out_dir / "summary.json").write_text(
             json.dumps({"best_val_loss": self.best_val,
@@ -182,15 +215,58 @@ class Trainer:
         return {"best_val_loss": self.best_val}
 
     def save(self, name: str, epoch: int) -> None:
-        torch.save({"epoch": epoch,
-                    "model": self.model.state_dict(),
-                    "optimizer": self.optimizer.state_dict(),
-                    "best_val": self.best_val,
-                    "cfg": self.cfg}, self.out_dir / name)
+        """Publish a complete epoch checkpoint without overwriting it on a failed write."""
+        path = self.out_dir / name
+        temporary = path.with_suffix(".pt.tmp")
+        try:
+            torch.save({"epoch": epoch,
+                        "model": self.model.state_dict(),
+                        "optimizer": self.optimizer.state_dict(),
+                        "best_val": self.best_val,
+                        "cfg": self.cfg,
+                        "scheduler": self.scheduler.state_dict() if self.scheduler else None,
+                        "scaler": self.scaler.state_dict(),
+                        "rng": rng_state(), "selection_key": self.selection_key,
+                        "history_fields": self.csv.fields,
+                        "training_commit": self.training_commit}, temporary)
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def load(self, path: str | Path) -> None:
-        ck = torch.load(path, map_location=self.device, weights_only=False)
+        """Resume at the next epoch; exact replay requires the same configuration/environment.
+
+        Keep the original run directory, including history.csv and best.pt. Global
+        RNG restoration covers the shared loaders; custom generators or persistent
+        worker RNGs are not captured. Legacy checkpoints permit best-effort loading.
+        """
+        # Load on CPU so optimizer counters keep their original placement; the
+        # state loaders move model weights and optimizer buffers onto the device.
+        ck = torch.load(path, map_location="cpu", weights_only=False)
+        if ck.get("selection_key", self.selection_key) != self.selection_key:
+            raise ValueError("checkpoint selection_key differs from the current configuration")
+        if "scheduler" in ck:
+            saved_name = str(ck.get("cfg", {}).get("scheduler", "none")).lower()
+            current_name = str(self.cfg.get("scheduler", "none")).lower()
+            if (saved_name != current_name
+                    or (ck["scheduler"] is None) != (self.scheduler is None)):
+                raise ValueError("checkpoint scheduler differs from the current configuration")
+        # Validate history before changing any model, optimiser, scheduler or RNG state.
+        self.csv.resume(ck.get("epoch", -1), expected_fields=ck.get("history_fields"))
         self.model.load_state_dict(ck["model"])
         self.optimizer.load_state_dict(ck["optimizer"])
         self.best_val = ck.get("best_val", float("inf"))
         self.start_epoch = ck.get("epoch", -1) + 1
+        self.training_commit = ck.get("training_commit", "unknown")
+        required = {"scheduler", "scaler", "rng", "selection_key", "training_commit"}
+        missing = required - ck.keys()
+        if missing:
+            warnings.warn("legacy checkpoint lacks resume state; exact resume is unavailable: "
+                          + ", ".join(sorted(missing)),
+                          RuntimeWarning)
+        if "scheduler" in ck and self.scheduler is not None:
+            self.scheduler.load_state_dict(ck["scheduler"])
+        if "scaler" in ck:
+            self.scaler.load_state_dict(ck["scaler"])
+        if "rng" in ck:
+            restore_rng(ck["rng"])
