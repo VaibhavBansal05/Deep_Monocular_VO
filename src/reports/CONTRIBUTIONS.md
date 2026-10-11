@@ -38,8 +38,8 @@ Append one line per member per week. Terse is fine; consistency is the point.
 | 22 Sep | Vaibhav | Reviewed and merged base PRs; fixed M4 pose scaling and rotation weight from measured statistics | m4/fix-pose-scaling |
 | 22 Sep | Vaibhav | Applied the same measured rotation weight to M2's config | fix/m2-rot-weight |
 | 24 Sep | Vaibhav | Literature review: 9-paper comparison table and per-member summaries | docs/literature-review |
-| 11 Oct | Suryansh | Implemented M3 ResNet18 DepthNet/PoseNet, RGB-only multi-scale loss, CPU tests/smokes, diagnostics, matched ablation configs and GPU runners; prepared separately tested shared integration patches; GPU results pending | pending review |
-| 11 Oct | Suryansh | Shared checkpoint-resume integration: scheduler/scaler/RNG restoration, exact CPU epoch-boundary replay, CSV/schema validation, atomic checkpoint writes and consistent best/last state; tests cover shuffled loaders and failed resumes/writes | base/checkpoint-resume (local; PR pending) |
+| 11 Oct | Suryansh | Implemented M3 ResNet18 DepthNet/PoseNet, RGB-only multi-scale loss, CPU tests/smokes, diagnostics, matched ablation configs and GPU runners; prepared separately tested shared integration patches; GPU results pending | #17 |
+| 11 Oct | Suryansh | Shared checkpoint-resume integration: scheduler/scaler/RNG restoration, exact CPU epoch-boundary replay, CSV/schema validation, atomic checkpoint writes and consistent best/last state; tests cover shuffled loaders and failed resumes/writes | #18 |
 
 ## Sign-off
 
