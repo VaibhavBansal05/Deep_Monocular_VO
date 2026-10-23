@@ -1,9 +1,9 @@
-# Interim submission (Part B) — due Fri 25 Sep 2026, 11:59 PM
+# Interim submission (Part B) — updated 3 Oct 2026
 
 | File | Purpose |
 |---|---|
 | `ICT4442_Interim_Report_PartB.docx` | the submission (editable) |
-| `ICT4442_Interim_Report_PartB.pdf` | rendered, 4 pages incl. cover — within the 3–5 page limit |
+| `ICT4442_Interim_Report_PartB.pdf` | rendered submission copy |
 | `build_report.py` | regenerates both; edit this rather than the .docx so changes are versioned |
 
 Regenerate after editing:
@@ -14,28 +14,23 @@ src/.venv/bin/python3 src/reports/interim/build_report.py
 cd src/reports/interim && soffice --headless --convert-to pdf ICT4442_Interim_Report_PartB.docx --outdir .
 ```
 
-## Still to fill — shown in red in the document
+## Results used in this version
 
-1. **Model 4 ATE / RPE.** `best.pt` (epoch 12) is in Drive but has not been evaluated.
-   ```bash
-   cd ~/DL_PROJECT/src
-   .venv/bin/python3 scripts/eval.py --model m4 --ckpt checkpoints/m4/best.pt --data-root data/vkitti2
-   ```
-2. **Model 2 results.** Training on Kaggle. Same command with `--model m2`.
+- `src/results/m1/metrics.json` from merged commit `22bb6dd`
+- `src/results/m2/m2_fp32_60_artifacts.zip`
+- `src/results/m4/m4_cbam_60_artifacts.zip`
 
-Then put the numbers into `build_report.py` (the `models` list) and regenerate.
+All three models were evaluated on `Scene20/clone`. M2 and M4 are 60-epoch FP32 runs,
+and the M4 archive also includes rain, fog and camera-rotation robustness results. Older loose files in
+`src/results/m2/` and `src/results/m4/` are from superseded experiments and are not cited.
 
 ## Still to do by hand
 
-- **Signatures.** The contribution log has an empty Signature column, and the guidelines
-  require the log to be signed by all members. Print, sign, and scan — or have each member
-  insert a signature image.
 - **Verify the literature figures.** Every number came from the PDFs in `REFERENCES/`, but
   PDF table extraction is unreliable. Each owner should re-check the papers listed against
   their name in `../literature/README.md`.
 - **Correct the synopsis citation.** Reference [7] is *Sensors* 2025, 25, 5448 — not
   "PMC Open Access, 2024".
-- **Confirm the team number**, which the template asks for and the synopsis does not record.
 
 ## What the submission needs alongside this
 

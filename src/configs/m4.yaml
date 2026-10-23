@@ -15,3 +15,6 @@ model:
 batch_size: 16
 lr: 1.0e-4
 epochs: 60
+# T4 FP16 backward produced non-finite gradients before the first update.
+# Keep the supervised geometric-pose runs in full FP32 for reliable training.
+amp: false
