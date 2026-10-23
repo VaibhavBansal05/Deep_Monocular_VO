@@ -6,6 +6,7 @@ src/checkpoints/
 *.ckpt
 *.npy
 *.lmdb
+src/results/*/*_artifacts.zip
 
 # Reference papers (77 MB of PDFs; keep local, GitHub dislikes them)
 REFERENCES/
