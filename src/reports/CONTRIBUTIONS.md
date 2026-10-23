@@ -38,6 +38,9 @@ Append one line per member per week. Terse is fine; consistency is the point.
 | 22 Sep | Vaibhav | Reviewed and merged base PRs; fixed M4 pose scaling and rotation weight from measured statistics | m4/fix-pose-scaling |
 | 22 Sep | Vaibhav | Applied the same measured rotation weight to M2's config | fix/m2-rot-weight |
 | 24 Sep | Vaibhav | Literature review: 9-paper comparison table and per-member summaries | docs/literature-review |
+| 21 Sep | Abhishek | Implemented the SE(3) geometry and projection/warping utilities with tests; added the M2 CNN and recurrent backbone | #4, M2 backbone commit a78a82d |
+| 3 Oct | Pranav | Implemented M1 feature extraction, cache, pose regressor and tests; recorded its evaluation results | #14, #15, #16 |
+| 2 Oct | Vaibhav | Developed and evaluated M4 attention model and supervised training fixes; compared available M1, M2 and M4 interim results | #3, #5, #11, #12, #13 |
 | 11 Oct | Suryansh | Implemented M3 ResNet18 DepthNet/PoseNet, RGB-only multi-scale loss, CPU tests/smokes, diagnostics, matched ablation configs and GPU runners; prepared separately tested shared integration patches; GPU results pending | #17 |
 | 11 Oct | Suryansh | Shared checkpoint-resume integration: scheduler/scaler/RNG restoration, exact CPU epoch-boundary replay, CSV/schema validation, atomic checkpoint writes and consistent best/last state; tests cover shuffled loaders and failed resumes/writes | #18 |
 
