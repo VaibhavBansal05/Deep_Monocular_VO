@@ -83,6 +83,11 @@ def checkpoint_model(path, device):
     return model.to(device).eval(), cfg
 
 
+def _imshow_rgb(ax, image):
+    """Render CHW RGB tensors, including boolean masks, with a supported dtype."""
+    ax.imshow(image.permute(1, 2, 0).float().cpu().numpy())
+
+
 @torch.no_grad()
 def visualize(checkpoint, root, split, out, device, with_depth=False):
     import matplotlib
@@ -113,7 +118,7 @@ def visualize(checkpoint, root, split, out, device, with_depth=False):
             (rgb[0, 1], f"target frame {int(batch['frame_idx'][0, 1])}"),
             (warped[0, 0], "previous -> target"), (warped[0, 1], "next -> target"),
             (mask[0].expand(3, -1, -1), f"active pixels: {float(active_fraction):.1%}")]):
-            axes[row, col].imshow(image.permute(1, 2, 0).cpu().numpy())
+            _imshow_rgb(axes[row, col], image)
             axes[row, col].set_title(title)
             axes[row, col].axis("off")
         depth_axes[row, 0].imshow(rgb[0, 1].permute(1, 2, 0).cpu().numpy())
