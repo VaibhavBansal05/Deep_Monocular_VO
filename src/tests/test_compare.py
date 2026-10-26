@@ -90,7 +90,8 @@ def test_main_adds_scale_note_and_reports_missing_models(tmp_path, monkeypatch, 
     main()
 
     output = capsys.readouterr().out
-    assert "Scale handling differs by design" in output
+    assert "M3 has an unresolved absolute-scale ambiguity" in output
+    assert "cannot resolve that scale by itself" in output
     assert "Not yet evaluated: m1, m2, m4." in output
 
 

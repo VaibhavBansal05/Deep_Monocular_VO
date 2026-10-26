@@ -123,10 +123,12 @@ def main() -> None:
     table = render(rows, args.latex)
 
     note = (
-        "\n\n> Scale handling differs by design: M1/M2/M4 use ground-truth scale "
-        "alignment, M3 recovers scale from its own depth prediction. Both "
-        "ATE sim(3) (scale solved) and ATE SE(3) (scale fixed) are therefore "
-        "reported. Bold marks the best value per column."
+        "\n\n> All models are evaluated with both Sim(3)-aligned ATE (scale "
+        "solved from the test trajectory for evaluation) and SE(3)-aligned "
+        "ATE (scale fixed). M1/M2/M4 learn metric translation from pose "
+        "labels; RGB-only M3 has an unresolved absolute-scale ambiguity. "
+        "Predicted monocular depth cannot resolve that scale by itself. "
+        "Bold marks the best value per column."
     )
     if missing:
         note += f"\n>\n> Not yet evaluated: {', '.join(missing)}."

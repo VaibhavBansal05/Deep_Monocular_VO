@@ -96,5 +96,9 @@ Two rules that matter:
 - **Metrics**: ATE RMSE (reported both `sim3`, scale-solved, and `se3`, scale-fixed),
   RPE translation/rotation at δ=1, KITTI `t_rel` / `r_rel`, plus depth AbsRel/RMSE/δ<1.25
   for M3. Params (M) and ms/frame for the compute trade-off.
-- **Scale**: M1/M2/M4 use GT scale alignment; M3 self-scales via median depth. This
-  asymmetry is why both `ate_sim3` and `ate_se3` are always reported.
+- **Scale**: M1/M2/M4 learn metric translation from pose labels. M3 trains from
+  RGB alone and has unresolved absolute-scale ambiguity; its own depth prediction
+  cannot recover metric scale. Every model reports both Sim(3)-aligned
+  (`ate_sim3`, scale solved for evaluation) and SE(3)-aligned (`ate_se3`, scale
+  fixed) trajectory error. Ground-truth median scaling, if used for M3 depth
+  evaluation, does not change pose trajectories.

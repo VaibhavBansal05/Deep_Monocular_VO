@@ -141,9 +141,11 @@ Fog / rain / 15-deg / 30-deg variations are held out entirely as an optional
 - **RPE** trans (m) / rot (deg) at delta=1 frame, plus KITTI `t_rel` (%) and
   `r_rel` (deg/100m) over 100..800m windows.
 - **Depth**: AbsRel, SqRel, RMSE, delta<1.25 — Model 3 only.
-- **Scale handling** (as the synopsis states): M1/M2/M4 use per-sequence GT scale
-  alignment; M3 uses median depth scaling. This asymmetry must be stated explicitly
-  in the report or the comparison is unfair — flag it in the table footnote.
+- **Scale handling**: M1/M2/M4 learn metric translation from pose labels.
+  RGB-only M3 cannot recover absolute scale from its own depth prediction.
+  Sim(3) evaluation aligns scale for every model; SE(3) evaluation leaves scale
+  fixed. Ground-truth median scaling is only for M3 depth evaluation and does
+  not change the pose trajectory. State this distinction in the report.
 - Cost: params (M), FLOPs, ms/frame on a fixed device. Rubric wants "computational
   trade-offs".
 - **Noise floor**: vKITTI's `extrinsic.txt` carries ~7 significant digits, so
