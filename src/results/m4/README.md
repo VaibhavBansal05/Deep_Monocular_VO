@@ -28,5 +28,11 @@ The earlier loose metrics and trajectory, recorded at code revision
 `6e76660`, are preserved in `previous_run_6e76660/`. The separate
 `history_unwhitened_run.csv` is also historical; it has not been identified
 as belonging to that earlier metrics file. Neither is the CBAM 60-epoch
-result. The planned `m4_none_60` run must remain separate until it is
-evaluated and verified.
+result.
+
+The verified `m4_none_60` run is kept under `no_attention/`, with its own
+metrics, trajectory, history, effective config, manifest, and robustness
+files. Its full archive is held locally as `m4_none_60_artifacts.zip` and is
+ignored by Git. The archive was initially downloaded with a CBAM filename;
+its internal directory, checkpoint, and manifest identify the no-attention
+run. See `ATTENTION_COMPARISON.md` for the matched comparison.

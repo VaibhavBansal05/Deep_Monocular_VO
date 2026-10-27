@@ -44,6 +44,7 @@ Append one line per member per week. Terse is fine; consistency is the point.
 | 11 Oct | Suryansh | Implemented M3 ResNet18 DepthNet/PoseNet, RGB-only multi-scale loss, CPU tests/smokes, diagnostics, matched ablation configs and GPU runners; prepared separately tested shared integration patches; GPU results pending | #17 |
 | 11 Oct | Suryansh | Shared checkpoint-resume integration: scheduler/scaler/RNG restoration, exact CPU epoch-boundary replay, CSV/schema validation, atomic checkpoint writes and consistent best/last state; tests cover shuffled loaders and failed resumes/writes | #18 |
 | 24 Oct | Vaibhav | Fixed M3 diagnostic image rendering after the Kaggle pilot exposed a boolean-mask plotting error; added a rendering regression test | fix/m3-visualization-mask |
+| 28 Oct | Vaibhav | Ran the 60-epoch M4 no-attention comparison on Kaggle; archived its checkpoint and verified test and robustness results against the matched CBAM run | m4/kaggle-none-runner |
 
 ## Sign-off
 
