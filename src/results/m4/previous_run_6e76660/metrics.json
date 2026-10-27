@@ -1,0 +1,26 @@
+{
+  "model": "m4",
+  "owner": "Vaibhav Krishna Bansal",
+  "split": "test",
+  "seed": 42,
+  "params_m": 12.49895,
+  "commit": "6e76660",
+  "ate_sim3": 20.314616150011407,
+  "ate_se3": 86.40894818020242,
+  "rpe_trans_rmse": 0.41110825538635254,
+  "rpe_rot_rmse_deg": 0.292424446719805,
+  "t_rel_pct": 37.912574768066406,
+  "r_rel_deg_per_100m": 5.680117963458123,
+  "ms_per_frame": 44.388336142854826,
+  "per_sequence": {
+    "Scene20/clone": {
+      "ate_sim3": 20.314616150011407,
+      "ate_se3": 86.40894818020242,
+      "rpe_trans_rmse": 0.41110825538635254,
+      "rpe_rot_rmse_deg": 0.292424446719805,
+      "t_rel_pct": 37.912574768066406,
+      "r_rel_deg_per_100m": 5.680117963458123,
+      "ms_per_frame": 44.388336142854826
+    }
+  }
+}
