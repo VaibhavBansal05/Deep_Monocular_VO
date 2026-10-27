@@ -1,0 +1,11 @@
+{
+  "run": "m4_cbam_60",
+  "model": "m4",
+  "config_file": "configs/m4.yaml",
+  "attention": "cbam",
+  "epochs_requested": 60,
+  "selected_epoch": 18,
+  "best_validation_ate": 7.357606781504479,
+  "git_commit": "b67d37a070d383f0a52186b2e4e02f572c98b58a",
+  "checkpoint": "checkpoint/best.pt"
+}
