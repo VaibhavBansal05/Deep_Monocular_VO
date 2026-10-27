@@ -38,9 +38,15 @@ these historical checks do not establish those features on the standalone branch
 
 ## Pending measured experiments
 
-No pretrained GPU pilot, 60-epoch baseline, depth evaluation, robustness run,
-latency benchmark or matched-budget ablation has been run. The user will run
-the Kaggle notebook. Depth acquisition is also a user-run step.
+A previous 200-step Kaggle GPU pilot completed at
+`3486a66fe528385497a7f02996d0e6eac7fa9490`. The owner reports train loss
+0.089903, validation loss 0.163761 and nonzero updates to both encoders, and
+has verified local copies of its checkpoints, logs and three diagnostic PNGs.
+Those owner-reported artifacts have not been independently rechecked for this
+record. The pilot predates the merged mask-rendering fix and is not a canonical
+benchmark. A fresh pilot from reviewed main is required by the 25 October
+runbook. No 60-epoch baseline, test/robustness result or depth score is claimed.
+Official depth acquisition and evaluation remain pending.
 
 | Experiment | Budget | Only change from matched baseline | Status |
 |---|---:|---|---|
@@ -56,13 +62,13 @@ Do not select the configuration using test depth/poses or robustness variants.
 
 ## Evidence to capture from Kaggle
 
-Pin the reviewed M3 implementation and explicitly set RUN_PILOT=True for the
+Pin the reviewed current main SHA and explicitly set RUN_PILOT=True for the
 200-step pilot. Inspect finite updates, active/valid coverage, reconstruction
 images and GPU memory, then freeze the full-run recipe. Record the exact
 checkpoint epoch/hash, training/evaluation revisions, cfg, library versions and
 hardware. Save history.csv, metrics.json, TUM trajectory, loss/coverage curves
-and fixed depth/reprojection examples. Reliable resume, depth evaluation and
-automatic run.json provenance require the separately reviewed shared integrations.
+and fixed depth/reprojection examples. Checkpoint resume is already merged;
+the separate depth-evaluation PR adds depth-specific provenance.
 Keep checkpoints outside Git.
 
 After validation selects best.pt, evaluate Scene20/clone once for the frozen
