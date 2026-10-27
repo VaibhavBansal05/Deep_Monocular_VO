@@ -1,0 +1,11 @@
+{
+  "run": "m4_none_60",
+  "model": "m4",
+  "config_file": "configs/m4_none.yaml",
+  "attention": "none",
+  "epochs_requested": 60,
+  "selected_epoch": 16,
+  "best_validation_ate": 6.3360984616861975,
+  "git_commit": "b67d37a070d383f0a52186b2e4e02f572c98b58a",
+  "checkpoint": "checkpoint/best.pt"
+}

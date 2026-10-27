@@ -46,6 +46,7 @@ Append one line per member per week. Terse is fine; consistency is the point.
 | 24 Oct | Vaibhav | Fixed M3 diagnostic image rendering after the Kaggle pilot exposed a boolean-mask plotting error; added a rendering regression test | fix/m3-visualization-mask |
 | 27 Oct | Suryansh | Prepared the fresh M3 Kaggle runner for the public RGB subset and implemented opt-in unique-frame depth evaluation, provenance, tests and scale disclosure | #22 (merged) |
 | 27 Oct | Suryansh | Ran a fresh 200-step GPU pilot and the 60-epoch canonical M3 training on his Kaggle account; selected epoch 40 by validation Sim(3) ATE, evaluated test and robustness poses, backed up outputs and recorded measured evidence; real depth evaluation pending | Kaggle Version 2; codex/m3-canonical-results |
+| 28 Oct | Vaibhav | Ran the 60-epoch M4 no-attention comparison on Kaggle; archived its checkpoint and verified test and robustness results against the matched CBAM run | m4/kaggle-none-runner |
 
 ## Sign-off
 
