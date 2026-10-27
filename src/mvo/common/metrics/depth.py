@@ -10,11 +10,20 @@ def depth_metrics(pred: np.ndarray, gt: np.ndarray,
                   min_depth: float = 1e-3, max_depth: float = 80.0,
                   median_scale: bool = True) -> dict:
     """Return standard monocular depth metrics over valid ground-truth pixels."""
-    mask = (gt > min_depth) & (gt < max_depth)
+    pred, gt = np.asarray(pred, dtype=np.float64), np.asarray(gt, dtype=np.float64)
+    if pred.shape != gt.shape:
+        raise ValueError("predicted and ground-truth depth shapes differ")
+    if not 0 < min_depth < max_depth:
+        raise ValueError("expected 0 < min_depth < max_depth")
+    if not np.isfinite(pred).all() or (pred <= 0).any():
+        raise ValueError("predicted depth must be finite and positive")
+    mask = np.isfinite(gt) & (gt > min_depth) & (gt < max_depth)
     pred, gt = pred[mask], gt[mask]
+    if not pred.size:
+        raise ValueError("no valid ground-truth depth pixels")
 
     scale = 1.0
-    if median_scale and pred.size:
+    if median_scale:
         scale = float(np.median(gt) / np.median(pred))
         pred = pred * scale
     pred = np.clip(pred, min_depth, max_depth)

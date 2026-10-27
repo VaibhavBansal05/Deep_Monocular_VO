@@ -123,8 +123,9 @@ def main() -> None:
     table = render(rows, args.latex)
 
     note = (
-        "\n\n> Scale handling differs by design: M1/M2/M4 use ground-truth scale "
-        "alignment, M3 recovers scale from its own depth prediction. Both "
+        "\n\n> Scale handling differs by design: M1/M2/M4 learn metric translation "
+        "from pose labels; self-supervised M3 has unresolved monocular scale. "
+        "Its depth prediction does not set the trajectory's metric scale. Both "
         "ATE sim(3) (scale solved) and ATE SE(3) (scale fixed) are therefore "
         "reported. Bold marks the best value per column."
     )
