@@ -1,6 +1,6 @@
 # M3 verification and experiment record
 
-Owner: Suryansh Bajaj. Created: 11 October 2026. Updated: 27 October 2026.
+Owner: Suryansh Bajaj. Created: 11 October 2026. Updated: 28 October 2026.
 
 ## What was actually run
 
@@ -80,9 +80,48 @@ The test [pose metrics](../../results/m3/metrics.json),
 and [loss/coverage curves](../../results/m3/loss_curves.png) are copied from
 the saved version. The trajectory is Sim(3)-aligned for display; monocular M3
 does not recover absolute scale. The especially large 30-degree viewpoint
-error is a measured robustness limitation. Real depth scores remain pending
-official VKITTI 2.0.3 depth and a separate evaluation-only version pinned to
-the depth-evaluation merge commit `1228bf151def45319a890aa2f4972de18a4d8831`.
+error is a measured robustness limitation.
+
+## Official VKITTI 2.0.3 depth evaluation, 28 October 2026
+
+The private [Kaggle evaluation Version 1](https://www.kaggle.com/code/suryanshbajaj/m3-official-depth-evaluation-2026-10-28?scriptVersionId=362965265)
+used the existing epoch-40 `best.pt` from the canonical run. Its SHA-256 was
+checked before evaluation. The notebook pinned the reviewed depth-evaluation
+merge commit `1228bf151def45319a890aa2f4972de18a4d8831`, retained
+`configs/m3.yaml` and seed 42, and skipped both the pilot and training cells.
+The repository suite passed 256 tests with three skipped. Kaggle reported a
+successful 353.8-second saved run on a Tesla T4.
+
+The depth input contains only [official Naver Virtual KITTI 2.0.3](https://europe.naverlabs.com/proxy-virtual-worlds-vkitti-2/)
+Camera_0 16-bit PNGs, paired by frame ID with the public RGB subset: 233 Scene02/clone
+validation frames and 837 Scene20/clone test frames. The official full depth
+archive matched Naver's MD5 `1d34a96f870fc5d33b482df87844f5e4`; the
+private evaluation subset retained the official relative paths and Naver's
+non-commercial attribution terms. The test evaluator scored all 837 frames
+once, skipped zero, used 128×416 without cropping, masked ground truth to
+`(0.001, 80)` metres, and averaged each metric over valid images.
+
+| Test depth scale | AbsRel ↓ | SqRel ↓ | RMSE (m) ↓ | RMSE-log ↓ | δ1 ↑ | δ2 ↑ | δ3 ↑ |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Per-image GT median (primary) | 0.379342 | 4.857547 | 10.592791 | 0.434861 | 0.455157 | 0.730260 | 0.869047 |
+| Raw prediction (secondary) | 0.975050 | 17.400691 | 22.636968 | 3.860457 | 0 | 0 | 0 |
+
+Median scaling is a depth-only reporting protocol; it does not set pose scale
+or imply metric depth at inference. Raw-scale accuracy is poor, with no test
+pixels within any of the three δ thresholds. The depth examples show broad
+scene layout but blurred boundaries around vehicles and the road; retain those
+visual limitations alongside the numeric scores. Test pose Sim(3) ATE was
+25.082 m again, matching the canonical pose evaluation. The depth JSON records
+training/evaluation commits, dataset versions, checkpoint epoch/hash, config,
+protocol, environment and per-sequence scores. The saved notebook remains
+private because it uses a private repository and depth input. The saved
+[depth JSON](../../results/m3/depth_evaluation/depth_metrics.json),
+[depth comparison plot](../../results/m3/depth_evaluation/depth_examples.png),
+[reprojection plot](../../results/m3/depth_evaluation/reprojection_examples.png)
+and [pose recheck](../../results/m3/depth_evaluation/metrics.json) are copied
+from the integrity-checked 249-file output ZIP. Its SHA-256 is recorded in the
+[manifest](../../results/m3/manifest.json), alongside the private subset ZIP
+hash and official archive MD5. Checkpoints and raw depth remain outside Git.
 
 ## Earlier pilot and remaining matched experiments
 
@@ -93,7 +132,7 @@ has verified local copies of its checkpoints, logs and three diagnostic PNGs.
 Those owner-reported artifacts have not been independently rechecked for this
 record. The pilot predates the merged mask-rendering fix and is not a canonical
 benchmark. The fresh pilot and canonical training reported above supersede
-that pending status. Official depth acquisition and evaluation remain pending.
+that pending status. Official depth evaluation is reported above.
 
 | Experiment | Budget | Only change from matched baseline | Status |
 |---|---:|---|---|
@@ -110,12 +149,12 @@ Do not select the configuration using test depth/poses or robustness variants.
 ## Evidence retained and remaining work
 
 The saved Kaggle versions, downloaded archives, checkpoint hashes, history,
-metrics, TUM trajectories and plots identify the pilot and full run separately.
-Keep checkpoints outside Git. The depth-evaluation code merged in PR #22, but
-has not been run on real depth. That evaluation must use official VKITTI 2.0.3
-ground truth, no crop, 128x416, valid GT `(0.001,80)` metres, image-level
-averaging, primary per-image median scaling and secondary raw scaling. Pose
-trajectories never inherit GT depth scales.
+metrics, TUM trajectories and plots identify the pilot, full run and depth
+evaluation separately. Keep checkpoints and raw depth outside Git. The depth
+evaluation followed the PR #22 protocol: official VKITTI 2.0.3 ground truth,
+no crop, 128×416, valid GT `(0.001,80)` metres, image-level averaging,
+primary per-image median scaling and secondary raw scaling. Pose trajectories
+never inherit GT depth scales.
 
 Inspect moving vehicles, occlusions, static intervals, texture-poor road/sky,
 depth saturation and camera-angle failures. Published KITTI scores and this
