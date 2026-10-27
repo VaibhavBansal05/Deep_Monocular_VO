@@ -36,6 +36,8 @@ def runtime(tmp_path, **settings):
                      RESULT_ROOT=tmp_path / "results", WORK=tmp_path, DATA_ROOT=tmp_path / "data",
                      RUN_PILOT=False, PILOT_STEPS=200, RUN_FULL=False, EVALUATE=False,
                      EVAL_CKPT=None, EVAL_DEPTH=False, HAS_CHECKPOINT_RESUME=False,
+                     RGB_DATASET_VERSION="vaibhavkrishnabansal/vkitti2-subset/1",
+                     DEPTH_DATASET_VERSION="suryanshbajaj/vkitti2-depth-m3/1",
                      NUM_WORKERS=2, PYTHON="unused", run=run, shutil=shutil,
                      subprocess=SimpleNamespace(check_output=lambda *a, **k: ""))
     namespace.update(settings)
@@ -43,7 +45,7 @@ def runtime(tmp_path, **settings):
 
 
 @pytest.mark.parametrize("notebook", NOTEBOOKS, ids=lambda p: p.name)
-def test_cells_compile_and_actions_default_to_opt_in(notebook):
+def test_cells_compile_and_training_defaults_are_safe(notebook):
     doc = json.loads(notebook.read_text())
     for index, cell in enumerate(doc["cells"]):
         if cell["cell_type"] == "code":
@@ -53,7 +55,8 @@ def test_cells_compile_and_actions_default_to_opt_in(notebook):
     switches = {node.targets[0].id: ast.literal_eval(node.value)
                 for node in assignments if isinstance(node.targets[0], ast.Name)
                 and node.targets[0].id in {"RUN_PILOT", "RUN_FULL", "EVALUATE"}}
-    assert switches == {"RUN_PILOT": False, "RUN_FULL": False, "EVALUATE": False}
+    assert switches == {"RUN_PILOT": notebook.name == "m3_kaggle.ipynb",
+                        "RUN_FULL": False, "EVALUATE": False}
 
 
 @pytest.mark.parametrize("notebook", NOTEBOOKS, ids=lambda p: p.name)
@@ -156,6 +159,10 @@ def test_optional_depth_evaluation_requires_supported_script(notebook, tmp_path,
     if available:
         execute(cells(notebook)[9], namespace)
         assert "--eval-depth" in calls[0]
+        if notebook.name == "m3_kaggle.ipynb":
+            assert len(calls) == 2  # no repeated robustness evaluation in a depth-only version
+            assert "--depth-dataset-version" in calls[0]
+            assert "depth_evaluation" in str(namespace["RESULTS"])
     else:
         with pytest.raises(RuntimeError, match="depth-evaluation integration"):
             execute(cells(notebook)[9], namespace)
