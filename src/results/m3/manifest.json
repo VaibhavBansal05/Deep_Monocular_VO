@@ -1,0 +1,30 @@
+{
+  "run": "m3_canonical_60_2026-10-27",
+  "owner": "Suryansh Bajaj",
+  "status": "pose_evaluated_depth_pending",
+  "notebook_version": "https://www.kaggle.com/code/suryanshbajaj/m3-canonical-pilot-2026-10-27?scriptVersionId=362807950",
+  "training_commit": "785e5ad933b3a0dd2ac96d940ebb981f0ab01709",
+  "pose_evaluation_commit": "785e5ad933b3a0dd2ac96d940ebb981f0ab01709",
+  "config_file": "configs/m3.yaml",
+  "config_sha256": "8e88f64219f34c00ad10b4b23c5bf8ee4c76af8ce78feff6409f01db0da5ab05",
+  "seed": 42,
+  "epochs_completed": 60,
+  "rgb_dataset": "vaibhavkrishnabansal/vkitti2-subset/1",
+  "rgb_sequences": 18,
+  "rgb_camera_0_frames": 8642,
+  "accelerator": "Kaggle Tesla T4; GPU T4 x2 setting, code used cuda:0",
+  "torch_version": "2.11.0+cu128",
+  "checkpoint_selection": {
+    "metric": "validation Sim(3) ATE in metres",
+    "best_epoch_zero_based": 40,
+    "best_value": 2.0232129262008347,
+    "best_pt_sha256": "d77b69537f75711a5d8b3b06aad5244f2bbed899d1f9933b823bffa59b2e55c4",
+    "last_pt_sha256": "a9b99dc2df3c419fe3f14d6fb0362cea2222ff37b68e023045ab30473cf2d819",
+    "checkpoints_committed": false
+  },
+  "output_archive_sha256": "b53834b7a838afee7cb0df0ebfa6381207d853b80a2d41503e84d6a70e742c8d",
+  "history_csv_git_copy": "same values as archive; CRLF normalized to LF",
+  "pose_test": "metrics.json",
+  "pose_robustness": "robustness/metrics.json",
+  "depth_evaluation": "pending official VKITTI 2.0.3 depth ground truth and evaluation-only Kaggle version"
+}

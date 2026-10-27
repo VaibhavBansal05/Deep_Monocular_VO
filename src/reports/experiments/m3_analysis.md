@@ -1,6 +1,6 @@
 # M3 verification and experiment record
 
-Owner: Suryansh Bajaj. Date: 11 October 2026.
+Owner: Suryansh Bajaj. Created: 11 October 2026. Updated: 27 October 2026.
 
 ## What was actually run
 
@@ -36,7 +36,55 @@ with one CUDA-only skip, including CPU epoch-boundary resume and synthetic depth
 evaluation of 837 unique frames. Those shared changes are outside this model PR;
 these historical checks do not establish those features on the standalone branch.
 
-## Pending measured experiments
+## Canonical Kaggle run, 27 October 2026
+
+The fresh 200-step GPU pilot and its backup were checked separately; pilot
+checkpoints were not used for training. The canonical run used the unchanged
+`configs/m3.yaml`, seed 42, public RGB subset version 1 (18 sequences and
+8,642 Camera_0 frames), and reviewed training commit
+`785e5ad933b3a0dd2ac96d940ebb981f0ab01709`. The saved [Kaggle Version 2](https://www.kaggle.com/code/suryanshbajaj/m3-canonical-pilot-2026-10-27?scriptVersionId=362807950)
+completed 60 epochs on a Tesla T4. The full output archive passed its ZIP
+integrity check; `best.pt`, `last.pt`, history, metrics, trajectories and plots
+were backed up outside Git. The [manifest](../../results/m3/manifest.json)
+records the archive and checkpoint hashes.
+
+The [fresh pilot Version 1](https://www.kaggle.com/code/suryanshbajaj/m3-canonical-pilot-2026-10-27?scriptVersionId=362802043)
+ran 200 optimizer steps at the same training commit. Its train total was
+0.089903, validation total 0.163761, and both encoder maximum updates were
+nonzero (depth 0.019785, pose 0.010995). Peak Torch allocation was 2.34 GiB
+on a Tesla T4. Its separate downloaded archive passed integrity checking and
+has SHA-256 `cb399dd5c33437705bbecae52a999e013400d31be64fe5b85b5f9ab667de5466`.
+These are integration diagnostics, not benchmark results.
+
+The best checkpoint is epoch 40 (zero-based), selected by the minimum
+validation Sim(3) ATE of **2.0232 m**. The checkpoint records the full
+training commit, `selection_key=val_ate`, epoch 40 and 60-epoch configuration;
+its SHA-256 matches the copy inside the output archive. `summary.json` names
+this value `best_val_loss`, but the selected value is ATE, not loss. All 60
+history rows have finite loss and coverage values, with positive active
+coverage. Training loss fell from 0.07037 to 0.02699; validation loss
+fluctuated and ended at 0.06039.
+
+| Evaluation with best checkpoint | Sim(3) ATE (m) | SE(3) ATE (m) |
+|---|---:|---:|
+| Test: Scene20/clone | 25.082 | 227.123 |
+| Robustness aggregate | 91.524 | 227.971 |
+| Scene20/rain | 33.296 | — |
+| Scene20/fog | 78.211 | — |
+| Scene20/15-deg-left | 48.469 | — |
+| Scene20/30-deg-right | 206.118 | — |
+
+The test [pose metrics](../../results/m3/metrics.json),
+[robustness metrics](../../results/m3/robustness/metrics.json),
+[history](../../results/m3/history.csv), [trajectory](../../results/m3/trajectory.png),
+and [loss/coverage curves](../../results/m3/loss_curves.png) are copied from
+the saved version. The trajectory is Sim(3)-aligned for display; monocular M3
+does not recover absolute scale. The especially large 30-degree viewpoint
+error is a measured robustness limitation. Real depth scores remain pending
+official VKITTI 2.0.3 depth and a separate evaluation-only version pinned to
+the depth-evaluation merge commit `1228bf151def45319a890aa2f4972de18a4d8831`.
+
+## Earlier pilot and remaining matched experiments
 
 A previous 200-step Kaggle GPU pilot completed at
 `3486a66fe528385497a7f02996d0e6eac7fa9490`. The owner reports train loss
@@ -44,13 +92,12 @@ A previous 200-step Kaggle GPU pilot completed at
 has verified local copies of its checkpoints, logs and three diagnostic PNGs.
 Those owner-reported artifacts have not been independently rechecked for this
 record. The pilot predates the merged mask-rendering fix and is not a canonical
-benchmark. A fresh pilot from reviewed main is required by the 25 October
-runbook. No 60-epoch baseline, test/robustness result or depth score is claimed.
-Official depth acquisition and evaluation remain pending.
+benchmark. The fresh pilot and canonical training reported above supersede
+that pending status. Official depth acquisition and evaluation remain pending.
 
 | Experiment | Budget | Only change from matched baseline | Status |
 |---|---:|---|---|
-| Canonical M3 | 60 epochs, step at 45 | None | Pending GPU |
+| Canonical M3 | 60 epochs, step at 45 | None | Complete; best epoch 40 |
 | Ablation control | 20 epochs, step at 15 | Shorter matched budget | Pending GPU |
 | No automasking | 20 epochs, step at 15 | automask=false | Pending GPU |
 | Mean reprojection | 20 epochs, step at 15 | min_reproj=false | Pending GPU |
@@ -60,22 +107,15 @@ Hold pretrained initialization, split, seed, batch size, augmentation and
 precision fixed. Compare each 20-epoch variant against the 20-epoch control.
 Do not select the configuration using test depth/poses or robustness variants.
 
-## Evidence to capture from Kaggle
+## Evidence retained and remaining work
 
-Pin the reviewed current main SHA and explicitly set RUN_PILOT=True for the
-200-step pilot. Inspect finite updates, active/valid coverage, reconstruction
-images and GPU memory, then freeze the full-run recipe. Record the exact
-checkpoint epoch/hash, training/evaluation revisions, cfg, library versions and
-hardware. Save history.csv, metrics.json, TUM trajectory, loss/coverage curves
-and fixed depth/reprojection examples. Checkpoint resume is already merged;
-the separate depth-evaluation PR adds depth-specific provenance.
-Keep checkpoints outside Git.
-
-After validation selects best.pt, evaluate Scene20/clone once for the frozen
-recipe, followed by the held-out robustness split in a separate output directory.
-Depth: no crop, 128x416, valid GT (0.001,80) metres, image-level averaging, primary
-per-image median scaling and secondary raw scaling. Pose trajectories never
-inherit GT depth scales. Report Sim(3) ATE and scale-fixed metrics separately.
+The saved Kaggle versions, downloaded archives, checkpoint hashes, history,
+metrics, TUM trajectories and plots identify the pilot and full run separately.
+Keep checkpoints outside Git. The depth-evaluation code merged in PR #22, but
+has not been run on real depth. That evaluation must use official VKITTI 2.0.3
+ground truth, no crop, 128x416, valid GT `(0.001,80)` metres, image-level
+averaging, primary per-image median scaling and secondary raw scaling. Pose
+trajectories never inherit GT depth scales.
 
 Inspect moving vehicles, occlusions, static intervals, texture-poor road/sky,
 depth saturation and camera-angle failures. Published KITTI scores and this
