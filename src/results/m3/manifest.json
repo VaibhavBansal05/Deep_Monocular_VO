@@ -1,7 +1,7 @@
 {
   "run": "m3_canonical_60_2026-10-27",
   "owner": "Suryansh Bajaj",
-  "status": "pose_evaluated_depth_pending",
+  "status": "pose_and_depth_evaluated",
   "notebook_version": "https://www.kaggle.com/code/suryanshbajaj/m3-canonical-pilot-2026-10-27?scriptVersionId=362807950",
   "training_commit": "785e5ad933b3a0dd2ac96d940ebb981f0ab01709",
   "pose_evaluation_commit": "785e5ad933b3a0dd2ac96d940ebb981f0ab01709",
@@ -26,5 +26,22 @@
   "history_csv_git_copy": "same values as archive; CRLF normalized to LF",
   "pose_test": "metrics.json",
   "pose_robustness": "robustness/metrics.json",
-  "depth_evaluation": "pending official VKITTI 2.0.3 depth ground truth and evaluation-only Kaggle version"
+  "depth_evaluation": {
+    "notebook_version": "https://www.kaggle.com/code/suryanshbajaj/m3-official-depth-evaluation-2026-10-28?scriptVersionId=362965265",
+    "evaluation_commit": "1228bf151def45319a890aa2f4972de18a4d8831",
+    "depth_dataset": "suryanshbajaj/virtual-kitti-2-0-3-depth-m3-evaluation-subset/1",
+    "official_archive_md5": "1d34a96f870fc5d33b482df87844f5e4",
+    "private_subset_zip_sha256": "d85803bb831e69c3970b7a1d176023c908221d74f04c111fcbc0c3867afaa00c",
+    "output_archive_sha256": "111a9014e5862ef9f20c545af595db9d1b9ee866acada83892cddc8ca8214f98",
+    "metrics_file": "depth_evaluation/depth_metrics.json",
+    "metrics_file_sha256": "8600d8ef06659f9e39c7d633cf207fab9b663b653376888fb2b20ad258300590",
+    "frames_seen": 837,
+    "frames_scored": 837,
+    "frames_skipped": 0,
+    "primary_scale": "per-image GT median",
+    "secondary_scale": "raw prediction",
+    "test_pose_metrics_file": "depth_evaluation/metrics.json",
+    "depth_plot": "depth_evaluation/depth_examples.png",
+    "reprojection_plot": "depth_evaluation/reprojection_examples.png"
+  }
 }
