@@ -72,8 +72,12 @@ self-supervised from RGB and has unresolved metric scale; its relatively
 small Sim(3) ATE and much larger SE(3) ATE illustrate why both alignments
 must be reported. Sim(3) scale is solved using the reference trajectory
 for evaluation. Predicted monocular depth does not establish metric pose
-scale by itself. A measured depth score remains pending official depth
-ground truth and a separate evaluation run.
+scale by itself. M3 was also evaluated against the official Virtual KITTI 2
+depth images on all 837 Scene20/clone frames. With a separate per-image
+ground-truth median scale for depth evaluation, its absolute relative depth
+error was 0.3793 and root mean squared error was 10.593 m. Without that scale
+correction, the absolute relative error was 0.9751. These depth scores do not
+alter the pose trajectory scale or the four-model pose table.
 
 The controlled M4 comparison shows a mixed effect of attention. On the
 test route, CBAM has 25.471 m Sim(3) ATE versus 26.886 m without attention,
@@ -97,10 +101,9 @@ measurements, not a hardware-controlled speed comparison.
 | --- | --- | --- |
 | M1 | `src/results/m1/metrics.json` | `009426b` |
 | M2 | `src/results/m2/metrics.json` | `b67d37a070d383f0a52186b2e4e02f572c98b58a` |
-| M3 | `src/results/m3/metrics.json` and `manifest.json` | `785e5ad933b3a0dd2ac96d940ebb981f0ab01709` |
+| M3 | `src/results/m3/metrics.json`, `depth_evaluation/depth_metrics.json`, and `manifest.json` | training `785e5ad933b3a0dd2ac96d940ebb981f0ab01709`; depth evaluation `1228bf151def45319a890aa2f4972de18a4d8831` |
 | M4 CBAM | `src/results/m4/metrics.json` and `manifest_cbam_60.json` | `b67d37a070d383f0a52186b2e4e02f572c98b58a` |
 
 M2 and M4 CBAM use the verified 60-epoch results. M4 no-attention metrics,
 history, and robustness trajectories are under `src/results/m4/no_attention/`.
-The archived checkpoints stay outside Git. No depth score or SE-attention
-score is included.
+The archived checkpoints stay outside Git. No SE-attention score is included.
