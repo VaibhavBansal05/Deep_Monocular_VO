@@ -15,9 +15,9 @@ from pathlib import Path
 
 MODEL_NAMES = {
     "m1": "Classical ORB/LK + MLP",
-    "m2": "CNN + GRU/LSTM",
+    "m2": "CNN + LSTM",
     "m3": "Self-supervised PoseNet+DepthNet",
-    "m4": "CNN + CBAM/SE attention",
+    "m4": "CNN + CBAM attention",
 }
 
 COLUMNS = [
@@ -127,7 +127,9 @@ def main() -> None:
         "from pose labels; self-supervised M3 has unresolved monocular scale. "
         "Its depth prediction does not set the trajectory's metric scale. Both "
         "ATE sim(3) (scale solved) and ATE SE(3) (scale fixed) are therefore "
-        "reported. Bold marks the best value per column."
+        "reported. Bold marks the best value per column. Recorded ms/frame "
+        "values came from different evaluation sessions and are not a matched "
+        "speed comparison."
     )
     if missing:
         note += f"\n>\n> Not yet evaluated: {', '.join(missing)}."
