@@ -21,8 +21,12 @@ cd src/reports/interim && soffice --headless --convert-to pdf ICT4442_Interim_Re
 - `src/results/m4/m4_cbam_60_artifacts.zip`
 
 All three models were evaluated on `Scene20/clone`. M2 and M4 are 60-epoch FP32 runs,
-and the M4 archive also includes rain, fog and camera-rotation robustness results. Older loose files in
-`src/results/m2/` and `src/results/m4/` are from superseded experiments and are not cited.
+and the M4 archive also includes rain, fog and camera-rotation robustness results.
+The M2 60-epoch metrics, history and trajectory are now in `src/results/m2/`;
+its older 25-epoch files are in `src/results/m2/previous_25_epoch/`. See the
+M2 result README for provenance. The verified 60-epoch CBAM result is now in
+`src/results/m4/`; its superseded loose result is preserved in
+`src/results/m4/previous_run_6e76660/`.
 
 ## Still to do by hand
 

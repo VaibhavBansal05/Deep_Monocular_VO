@@ -36,3 +36,8 @@ files. Its full archive is held locally as `m4_none_60_artifacts.zip` and is
 ignored by Git. The archive was initially downloaded with a CBAM filename;
 its internal directory, checkpoint, and manifest identify the no-attention
 run. See `ATTENTION_COMPARISON.md` for the matched comparison.
+
+Both full archives also have verified local copies under
+`src/checkpoints/m4/artifact_backups/` (ignored by Git). Their SHA-256 hashes
+are in `ARCHIVE_CHECKSUMS.sha256`. These copies share the same disk, so the
+original Kaggle notebook outputs should also be retained for recovery.

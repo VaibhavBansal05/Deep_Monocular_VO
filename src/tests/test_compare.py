@@ -80,7 +80,7 @@ def test_render_treats_non_finite_metrics_as_unavailable(non_finite):
     }
 
     assert rendered_rows["Classical ORB/LK + MLP"][6] == "—"
-    assert rendered_rows["CNN + GRU/LSTM"][6] == "**2.00**"
+    assert rendered_rows["CNN + LSTM"][6] == "**2.00**"
 
 
 def test_main_adds_scale_note_and_reports_missing_models(tmp_path, monkeypatch, capsys):

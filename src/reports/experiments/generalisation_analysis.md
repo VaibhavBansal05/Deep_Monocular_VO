@@ -1,5 +1,10 @@
 # Why the models drift: diagnosis after the whitened runs
 
+> Historical analysis of earlier 25-epoch runs. Its checkpoint-selection
+> observations and recommendations describe those runs. The current verified
+> 60-epoch M2 and M4 results are in `src/results/m2/` and `src/results/m4/`;
+> M4 now selects on validation trajectory error.
+
 ## 1. Whitening helped M4, and the M2 comparison is confounded
 
 |  | ATE sim(3) | ATE SE(3) | t_rel | r_rel |

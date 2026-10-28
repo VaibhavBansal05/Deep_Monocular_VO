@@ -34,13 +34,19 @@ def test_spatial_attention_is_a_single_map_in_0_1():
 
 
 def test_channel_attention_uses_both_pools():
-    """CBAM's claim is that average and max pooling are complementary, so a
-    change visible only to max pooling must still move the output."""
+    """Equal channel means with different maxima must produce different gates."""
     m = ChannelAttention(16)
-    x = torch.zeros(1, 16, 4, 4)
-    before = m(x).clone()
-    x[0, 3, 2, 2] = 50.0            # a single spike: mean barely moves, max does
-    assert not torch.allclose(before, m(x), atol=1e-4)
+    with torch.no_grad():
+        m.mlp[0].weight.zero_()
+        m.mlp[2].weight.zero_()
+        m.mlp[0].weight[0, 3, 0, 0] = 1.0
+        m.mlp[2].weight[0, 0, 0, 0] = 1.0
+    spread = torch.zeros(1, 16, 4, 4)
+    spread[0, 3, 0, :] = 1.0
+    spike = torch.zeros_like(spread)
+    spike[0, 3, 0, 0] = 4.0
+    assert torch.equal(spread.mean((2, 3)), spike.mean((2, 3)))
+    assert not torch.allclose(m(spread), m(spike), atol=1e-4)
 
 
 def test_se_has_no_spatial_branch():
