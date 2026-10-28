@@ -48,7 +48,7 @@ Append one line per member per week. Terse is fine; consistency is the point.
 | 27 Oct | Suryansh | Ran a fresh 200-step GPU pilot and the 60-epoch canonical M3 training on his Kaggle account; selected epoch 40 by validation Sim(3) ATE, evaluated test and robustness poses, backed up outputs and recorded measured pose evidence | Kaggle Version 2; codex/m3-canonical-results |
 | 28 Oct | Suryansh | Verified official VKITTI 2.0.3 depth against Naver's MD5, prepared a private attributed evaluation subset, ran the merged M3 depth evaluator using his validation-selected checkpoint, and recorded 837 unique test-frame scores and provenance | Kaggle depth Version 1; codex/m3-official-depth-results |
 | 28 Oct | Vaibhav | Ran the 60-epoch M4 no-attention comparison on Kaggle; archived its checkpoint and verified test and robustness results against the matched CBAM run | m4/kaggle-none-runner |
-| 28 Oct | Vaibhav | Promoted the verified M2 result, checked M4 archive provenance, generated the four-model comparison, and drafted the M4 results and discussion for Part C | final/verified-comparison-report |
+| 28 Oct | Vaibhav | Promoted the verified M2 result, checked M4 archive provenance, generated the four-model comparison, drafted the M4 results and discussion for Part C, and incorporated Suryansh's M3 depth findings | final/verified-comparison-report, docs/record-m3-depth-result |
 
 ## Sign-off
 
