@@ -1,74 +1,105 @@
-# Deep_Monocular_VO — Deep Learning-Based Monocular Visual Odometry for Autonomous Spatial Mapping
+# Deep Monocular Visual Odometry
 
 [![ci](https://github.com/VaibhavBansal05/Deep_Monocular_VO/actions/workflows/ci.yml/badge.svg)](https://github.com/VaibhavBansal05/Deep_Monocular_VO/actions/workflows/ci.yml)
 
-ICT-4442 Deep Learning Mini Project · Manipal Institute of Technology · Aug–Oct 2026
+Estimating camera motion from a single moving camera, using four approaches on
+[Virtual KITTI 2](https://europe.naverlabs.com/research/computer-vision/proxy-virtual-worlds-vkitti-2/).
+Team deep learning project · Manipal Institute of Technology · 2026
 
-Four deep-learning architectures for 6-DoF monocular ego-motion estimation, trained and
-evaluated on **Virtual KITTI 2** under one identical protocol.
+We compared a classical-feature regressor (M1), a recurrent CNN (M2), a
+self-supervised depth-and-pose network (M3), and an attention-based CNN (M4).
+Each predicts six-degree-of-freedom relative camera motion; the same held-out
+`Scene20/clone` sequence was used for the pose results below.
 
-| Model | Architecture | Owner |
-|---|---|---|
-| M1 | Classical ORB/Lucas-Kanade features + MLP regressor | Pranav Joshi |
-| M2 | CNN (ResNet18) + GRU/LSTM recurrent pose regression | Abhishek Laxman Jadhav |
-| M3 | Self-supervised PoseNet + DepthNet, photometric reprojection loss | Suryansh Bajaj |
-| M4 | CNN + CBAM/SE convolutional attention | Vaibhav Krishna Bansal |
+## Results at a glance
 
-## Repository layout
+| Model | Approach | Sim(3) trajectory error ↓ | SE(3) trajectory error ↓ |
+| --- | --- | ---: | ---: |
+| M1 | ORB features + multilayer perceptron | 24.21 m | 68.32 m |
+| M2 | ResNet18 + LSTM | 61.65 m | 82.84 m |
+| M3 | Self-supervised depth + pose | 25.08 m | 227.12 m |
+| **M4** | **ResNet18 + CBAM attention** | **25.47 m** | **75.27 m** |
 
-```
-DOCS/          course-issued documents — synopsis, guidelines, report template
-REFERENCES/    the 9 reference papers (gitignored: 77 MB of PDFs, kept local)
-src/           everything we build
-  mvo/common/  shared base — split, geometry, metrics, training engine
-  mvo/models/  one folder per model, single owner each
-  configs/     one YAML per model, inheriting configs/base.yaml
-  scripts/     train.py · eval.py · compare.py · prepare_data.py
-  results/     metrics.json + trajectories + plots (committed — evidence)
-  reports/     literature review, methodology sections, contribution log
-```
+These are absolute trajectory error (ATE) root-mean-square values from the
+saved [test results](src/results/). Sim(3) aligns the estimated path to ground
+truth **including scale**; SE(3) fits a rigid transform **without changing
+scale**. M3's large scale-fixed error is consistent with the unresolved metric
+scale of RGB-only self-supervision and its accumulated drift. These are results
+on one held-out scene, not claims of general performance across datasets.
 
-See [PLAN.md](PLAN.md) for the full implementation plan and
-[src/reports/CONTRIBUTIONS.md](src/reports/CONTRIBUTIONS.md) for the task matrix.
+![Ground-truth and M4 CBAM camera trajectories on Scene20/clone](assets/m4_trajectory.png)
 
-## Quick start
+*Full test trajectory in world X–Z coordinates. The M4 path is Sim(3)-aligned
+for display; alignment uses the reference trajectory and does not resolve
+monocular scale at inference. The figure can be regenerated with
+[`plot_readme_trajectory.py`](src/scripts/plot_readme_trajectory.py).*
+
+## My contribution: M4 and its attention test
+
+I developed the [M4 pose model](src/mvo/models/m4_cnn_attention/) around a
+pretrained ResNet18 encoder. It takes two consecutive RGB images, applies
+Convolutional Block Attention Module (CBAM) after each encoder stage, and regresses
+the camera's relative translation and rotation. I also built the initial
+repository scaffold and shared training contracts, worked on supervised pose
+training fixes, and ran and checked M4's 60-epoch Kaggle experiments. Other
+team members owned the dataset loader, geometry and metrics, and M1–M3; their
+work is recorded in the [contribution log](src/reports/CONTRIBUTIONS.md).
+
+To isolate the effect of attention, I compared CBAM with the **same M4 model
+without attention**, using the same data split, code revision, seed, training
+budget and checkpoint-selection rule:
+
+| M4 test metric ↓ | CBAM | No attention |
+| --- | ---: | ---: |
+| Sim(3) ATE | **25.47 m** | 26.89 m |
+| SE(3) ATE | 75.27 m | **53.39 m** |
+| Relative translation error | 35.67% | **33.66%** |
+
+CBAM improved scale-aligned ATE on the test scene and the mean Sim(3) ATE over
+four held-out weather/camera conditions (79.76 m versus 102.13 m). Without
+attention, scale-fixed ATE and local translation error were better. The effect
+was **mixed**, and one seed is insufficient to claim attention is always
+better. See the [full attention comparison](src/results/m4/ATTENTION_COMPARISON.md)
+and its [run provenance](src/results/m4/README.md).
+
+## Project structure
+
+| Path | What it contains |
+| --- | --- |
+| [`src/mvo/models/`](src/mvo/models/) | Four model implementations |
+| [`src/mvo/common/`](src/mvo/common/) | Shared data, geometry, training and metrics |
+| [`src/configs/`](src/configs/) | Versioned experiment configurations |
+| [`src/results/`](src/results/) | Metrics, trajectories and experiment notes |
+| [`src/scripts/`](src/scripts/) | Training, evaluation and comparison commands |
+
+The [synopsis](DOCS/MVO_Synopsis.pdf) describes the original research plan;
+[PLAN.md](PLAN.md) and the [final report](src/reports/final/) provide more
+context. Model ownership: [Pranav](src/mvo/models/m1_classical_mlp/) (M1),
+[Abhishek](src/mvo/models/m2_cnn_rnn/) (M2),
+[Suryansh](src/mvo/models/m3_selfsup_posedepth/) (M3), and
+[Vaibhav](src/mvo/models/m4_cnn_attention/) (M4).
+
+## Reproduce locally
 
 ```bash
-git clone <repo-url> && cd Deep_Monocular_VO/src
-python -m venv .venv && source .venv/bin/activate
-# EVERY member must do this once, with the email on their GitHub account.
-# Wrong email -> commits show as an unlinked ghost author and cannot be verified.
-git config user.name  "Your Name"
-git config user.email "your-github-email@example.com"
-
-cd .. && bash tools/setup.sh && cd src   # hooks + identity check + tests
-python scripts/prepare_data.py --root data/vkitti2   # ~6-8 GB subset
-python scripts/train.py --model m4 --config configs/m4.yaml
-python scripts/eval.py  --model m4 --ckpt checkpoints/m4/best.pt
-python scripts/compare.py                            # -> the comparison table
+git clone https://github.com/VaibhavBansal05/Deep_Monocular_VO.git
+cd Deep_Monocular_VO
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e 'src[dev]'
+cd src
+pytest -q
+# Download/extract the VKITTI2 subset under src/data/vkitti2 first.
+python scripts/train.py --model m4 --config configs/m4.yaml \
+  --data-root data/vkitti2 --out checkpoints/m4
+python scripts/eval.py --model m4 --ckpt checkpoints/m4/best.pt \
+  --data-root data/vkitti2 --split test --out results/m4_local
 ```
 
-All commands run from `src/`.
-
-## Where the work happens
-
-**Code locally, train on Colab.** Everything except GPU training is CPU work — editing,
-the contract tests (~1 s), lint, ORB feature extraction, metrics, plots. Only M2/M3/M4
-training needs a GPU. M1 precomputes its features once and then trains an MLP on 192-d
-vectors, so it runs fine on a laptop CPU.
-
-For GPU runs, copy `notebooks/colab_train_template.ipynb` and change `MODEL`. It mounts
-Drive, unpacks the shared 1.5 GB dataset archive, clones this repo at your branch, trains
-with checkpoints written to Drive (so a disconnect costs one epoch, not the run), and
-evaluates.
-
-Two rules that matter:
-
-- **Never edit model code in a Colab cell.** Edit locally, commit, push, re-clone. Code
-  written only in a notebook is not in your commit history — which is what the project is
-  graded on.
-- **Never commit checkpoints.** `*.pt` stays in Drive. Do commit `results/<model>/metrics.json`,
-  trajectories and plots; they are small and they are the evidence trail.
+GPU experiments used [Kaggle notebooks](src/notebooks/) and the public
+[VKITTI2 RGB subset](https://www.kaggle.com/datasets/vaibhavkrishnabansal/vkitti2-subset).
+Checkpoints and raw data are excluded from Git; small result files are kept
+under [`src/results/`](src/results/).
 
 ## Repository rules
 
